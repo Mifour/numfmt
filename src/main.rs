@@ -63,6 +63,26 @@ fn validate_unit(s: String) -> Result<(), String> {
 	}
 }
 
+fn validate_invalid(s: String) -> Result<(), String> {
+	match s.to_lowercase().as_str(){
+		"fail" => Ok(()),
+		"warn" => Ok(()),
+		"ignore" => Ok(()),
+		_ => Err(String::from("invalid invalid mode"))
+	}
+}
+
+fn validate_round(s: String) -> Result<(), String>{
+	match s.to_lowercase().as_str(){
+		"up"=> Ok(()),
+		"down"=> Ok(()),
+		"from-zero (default)"=> Ok(()),
+		"towards-zero"=> Ok(()),
+		"nearest"=> Ok(()),
+		_ => Err(String::from("invalid round method"))
+	}
+}
+
 fn main() {
 	// let arg_vec = vec![
 	// 	"debug", "delimiter", "field", "format", "from", "grouping", "header",
@@ -105,17 +125,17 @@ fn main() {
     	.arg(Arg::with_name("grouping")
            .long("grouping")
            .help("use locale defined grouping of digits e.g. 1,000,000 (which means it has no effect on the C/POSIX locale)"))
-    	.arg(Arg::with_name("header")
+    	.arg(Arg::with_name("header") // ToDo: fix with 0 explicit args
            .long("header")
            .value_name("N")
            .help("print whitout convertion the first N header lines (default 1)")
            .validator(strick_positive_int)
-           .default_value("1")
            .takes_value(true))
     	.arg(Arg::with_name("invalid")
            .long("invalid")
            .value_name("MODE")
            .help("failure mode for invalid numbers among: abort (default), fail, warn, ignore")
+           .validator(validate_invalid)
            .takes_value(true))
     	.arg(Arg::with_name("padding")
            .long("padding")
@@ -172,11 +192,11 @@ fn main() {
 \tOptional zero (%010f) width will zero pad the number.
 \tOptional negative values (%-10f) will left align.
 \tOptional precision(%.1f) will override the input determined precision.
-\nExit status is 0 if all input numbers were successfullyconverted.
-\tBy default, numfmt will stop at the first conversionerror with exit status 2.
-\tWith --invalid='fail' a warning isprinted for each conversion error and the exit status is 2.  
-\tWith --invalid='warn' each conversion error is diagnosed, but the exitstatus is 0.  
-\tWith --invalid='ignore' conversion errors are notdiagnosed and the exit status is 0.
+\nExit status is 0 if all input numbers were successfully converted.
+\tBy default, numfmt will stop at the first conversion error with exit status 2.
+\tWith --invalid='fail' a warning is printed for each conversion error and the exit status is 2.  
+\tWith --invalid='warn' each conversion error is diagnosed, but the exit status is 0.  
+\tWith --invalid='ignore' conversion errors are not diagnosed and the exit status is 0.
 \nExamples:
 \t$ numfmt --to=si 1000\n\t\t -> \"1.0K\"
 \t$ numfmt --to=iec 2048\n\t\t -> \"2.0K\"

@@ -1,5 +1,5 @@
 extern crate clap;
-use clap::{Arg, App};
+use clap::{Arg, App, ArgMatches};
 use std::cmp::min;
 use std::io::{self, BufRead};
 
@@ -70,9 +70,18 @@ fn validate_format(s: String) -> Result<(), String>{
 	}
 }
 
-fn validate_unit(s: String) -> Result<(), String> {
+fn validate_unit_from(s: String) -> Result<(), String> {
 	match s.to_lowercase().as_str(){
 		"auto" => Ok(()),
+		"si" => Ok(()),
+		"iec" => Ok(()),
+		"iec-i" => Ok(()),
+		_ => Err(String::from("invalid unit arg"))
+	}
+}
+
+fn validate_unit_to(s: String) -> Result<(), String> {
+	match s.to_lowercase().as_str(){
 		"si" => Ok(()),
 		"iec" => Ok(()),
 		"iec-i" => Ok(()),
@@ -108,7 +117,7 @@ fn validate_eici_suffix(s: &String) -> bool{
 	"KiMiGiTiPiEiZiYi".contains(s)
 }
 
-fn get_si_power(s: &String)-> (i8, i64){
+fn get_si_power(s: &String)-> (u8, i64){
 	if ! validate_si_suffix(s){
 
 	}
@@ -126,7 +135,7 @@ fn get_si_power(s: &String)-> (i8, i64){
 	(10, power.clone())
 }
 
-fn get_eic_power(s: &String) ->(i8, i64){
+fn get_eic_power(s: &String) ->(u8, i64){
 	if ! (validate_si_suffix(s) || validate_eici_suffix(s)){
 
 	}
@@ -152,7 +161,7 @@ fn get_eic_power(s: &String) ->(i8, i64){
 	(2, power.clone())
 }
 
-fn get_auto_power(s: &String) -> (i8, i64){
+fn get_auto_power(s: &String) -> (u8, i64){
 	if validate_si_suffix(s){
 		return get_si_power(s);
 	}
@@ -205,6 +214,121 @@ fn to_eic_power(eic_i: bool, base: u8, power: i64) -> (String, i64){
 	}
 }
 
+fn munfmt(mut number: String, inputs:ArgMatches){
+	// trim header lines from number if needed
+    let header = inputs.value_of("header").unwrap_or("0")
+    	.parse::<usize>().unwrap();
+    let mut header_end:usize = 0;
+    if header > 0{
+    	let indices: Vec<(usize, &str)> = number.match_indices("\n").collect();
+    	header_end  = indices[min(indices.len(), header)].0;
+    }
+    let h_text = &number[..header_end];
+    if !h_text.is_empty(){
+    	println!("HEADERS: {:?}", h_text);
+    }
+    number = number[header_end..].to_string();
+
+    let mut base: u8 = 10;
+    let mut power: i64 = 1;
+    
+    if inputs.is_present("from"){
+    	let from = inputs.value_of("from").unwrap_or("auto");
+    	let res = match from.to_lowercase().as_str(){
+    		"si" => {
+    			get_si_power(&number)
+    		},
+    		"iec" => {
+    			get_eic_power(&number)
+    		},
+    		"iec-i" => {
+    			get_eic_power(&number)
+    		}
+    		_ => {
+    			get_auto_power(&number)
+    		}
+    	};
+    	base = res.0;
+    	power = res.1;
+    	// strip number from its old unit
+    	number = "xxxx".to_string()
+    }
+    println!("{:?}", base);
+    println!("{:?}", power);
+    
+    
+    
+    // convert string to number
+    let mut res:f64 = number.parse::<f64>().unwrap();
+    // scale to unit_size
+    let unit_size = inputs.value_of("to-unit").unwrap_or("1.0")
+    	.parse::<f64>().unwrap();
+    res = res / unit_size;
+
+    if inputs.is_present("rounding"){
+    	match inputs.value_of("rouding").unwrap_or("from-zero").to_lowercase().as_str(){
+			"up"=> {
+				res = res.ceil();
+			},
+			"down"=> {
+				res = res.floor();
+			},
+			"from-zero"=> {
+				//away from-zero
+				res = res.trunc() + res.signum();
+			},
+			"towards-zero"=> {
+				res = res.trunc();
+			},
+			"nearest"=> {
+				res = res.round();
+			},
+			_ => {}
+		}
+    }
+
+    let mut suffix = "".to_string();
+    if inputs.is_present("to"){
+    	let to = inputs.value_of("to").unwrap();
+    	let tmp = match to.to_lowercase().as_str(){
+    		"si" => {
+    			to_si_power(base, power)
+    		},
+    		"iec" => {
+    			to_eic_power(false, base, power)
+    		},
+    		"iec-i" => {
+    			to_eic_power(true, base, power)
+    		}
+    		_ => {(suffix, power)}
+    	};
+    	suffix = tmp.0;
+    	power = tmp.1;
+    }
+    // todo fix that
+    res = res * base.pow(power);
+    
+    
+    let mut res = res.to_string();
+    // convert to exporting format
+    if inputs.is_present("grouping"){
+    	let res_str = res.clone();
+    	let (mut to_add, mut remain) = res_str.split_at(res_str.len().modulo(3));
+    	let mut res_vec = vec![to_add];
+    	while remain.len()>3{
+    		let x = remain.split_at(3);
+    		to_add = x.0;
+    		remain = x.1;
+    		res_vec.push(to_add.clone());
+    	}
+    	res_vec.push(remain.clone());
+    	res = res_vec.join(",");
+
+    }
+
+    println!("FINAL: {:?}{:?}", res, suffix);
+}
+
 
 
 fn main() {
@@ -244,7 +368,7 @@ fn main() {
            .long("from")
            .value_name("UNIT")
            .help("specify the input unit size (default 1")
-           .validator(validate_unit)
+           .validator(validate_unit_from)
            .takes_value(true))
     	.arg(Arg::with_name("grouping")
            .long("grouping")
@@ -282,7 +406,7 @@ fn main() {
            .long("to")
            .value_name("UNIT")
            .help("auto scale output to UNITs (see UNITs)")
-           .validator(validate_unit)
+           .validator(validate_unit_to)
            .takes_value(true))
     	.arg(Arg::with_name("to-unit")
            .long("to-unit")
@@ -332,111 +456,23 @@ fn main() {
 \t$ ls -l  | numfmt --header --field 5 --to=iec
 \t$ ls -lh | numfmt --header --field 5 --from=iec --padding=10
 \t$ ls -lh | numfmt --header --field 5 --from=iec --format %10f")
-    	.get_matches(); //_from_safe(arg_vec).unwrap_or_else(|e| e.exit());
-    	println!("{:?}", inputs);
-    	println!("is_present header: {:?}", inputs.is_present("header"));
+    .get_matches(); //_from_safe(arg_vec).unwrap_or_else(|e| e.exit());
+    println!("{:?}", inputs);
+    println!("is_present header: {:?}", inputs.is_present("header"));
+
     // Retrieve the main arg NUMBER from Clap if possible else,
     // try with stdin (in case of pipe command)
     //let mut number = String::from(inputs.value_of("NUMBER").unwrap());
     //let mut number = String::new();
-    let mut number = match inputs.value_of("NUMBER") {
+    let numbers = match inputs.value_of("NUMBER") {
     	Some(value) => String::from(value),
-    	// TODO:
-    	// FIX stdin read
-    	None => io::stdin().lock().lines().map(|line| line.unwrap()).collect::<Vec<String>>().join("\n")
+    	None => io::stdin().lock().lines().map(|line| line.unwrap()).take_while(|line| !line.is_empty()).collect::<Vec<String>>().join("\n")
 	};
-	println!("NUMBER:{:?}", number);
-	if number.is_empty(){
-		eprintln!("{}", "The <NUMBER> required arguments were not provided");
+	println!("NUMBER:{:?}", numbers);
+	if numbers.is_empty(){
+		eprintln!("{}", "The <NUMBER> required argument were not provided");
         std::process::exit(1);
 	}
-	// trim header lines from number if needed
-    let header = inputs.value_of("header").unwrap_or("0")
-    	.parse::<usize>().unwrap();
-    let mut header_end:usize = 0;
-    if header > 0{
-    	let indices: Vec<(usize, &str)> = number.match_indices("\n").collect();
-    	header_end  = indices[min(indices.len(), header)].0;
-    }
-    let h_text = &number[..header_end];
-    if !h_text.is_empty(){
-    	println!("HEADERS: {:?}", h_text);
-    }
-    number = number[header_end..].to_string();
-
-    let mut power: i64 = 0;
-    let mut base: i8 = 0;
-    
-    if inputs.is_present("from"){
-    	let from = inputs.value_of("from").unwrap_or("auto");
-    	let res = match from.to_lowercase().as_str(){
-    		"si" => {
-    			get_si_power(&number)
-    		},
-    		"iec" => {
-    			get_eic_power(&number)
-    		},
-    		"iec-i" => {
-    			get_eic_power(&number)
-    		}
-    		_ => {
-    			get_auto_power(&number)
-    		}
-    	};
-    	base = res.0;
-    	power = res.1;
-
-    }
-    println!("{:?}", base);
-    println!("{:?}", power);
-    
-    
-    
-    // convert string to number
-    let mut res:f64 = number.parse::<f64>().unwrap();
-    // scale to unit_size
-    let unit_size = inputs.value_of("to-unit").unwrap_or("1.0")
-    	.parse::<f64>().unwrap();
-    res = res / unit_size;
-
-    if inputs.is_present("rounding"){
-    	match inputs.value_of("rouding").unwrap_or("from-zero").to_lowercase().as_str(){
-			"up"=> {
-				res = res.ceil();
-			},
-			"down"=> {
-				res = res.floor();
-			},
-			"from-zero"=> {
-				//away from-zero
-				res = res.trunc() + res.signum();
-			},
-			"towards-zero"=> {
-				res = res.trunc();
-			},
-			"nearest"=> {
-				res = res.round();
-			},
-			_ => {}
-		}
-    }
-    
-    let mut res = res.to_string();
-    // convert to exporting format
-    if inputs.is_present("grouping"){
-    	let res_str = res.clone();
-    	let (mut to_add, mut remain) = res_str.split_at(res_str.len().modulo(3));
-    	let mut res_vec = vec![to_add];
-    	while remain.len()>3{
-    		let x = remain.split_at(3);
-    		to_add = x.0;
-    		remain = x.1;
-    		res_vec.push(to_add.clone());
-    	}
-    	res_vec.push(remain.clone());
-    	res = res_vec.join(",");
-
-    }
-
-    println!("FINAL: {:?}", res);
+	numbers.lines().for_each(|number| munfmt(number.to_string(), inputs.clone()));
+	
 }

@@ -113,13 +113,13 @@ fn validate_si_suffix(s: &String) -> bool{
 	"KMGTPEZY".contains(s)
 }
 
-fn validate_eici_suffix(s: &String) -> bool{
+fn validate_ieci_suffix(s: &String) -> bool{
 	"KiMiGiTiPiEiZiYi".contains(s)
 }
 
 fn get_si_power(s: &String)-> (u8, i64){
-	if ! validate_si_suffix(s){
-
+	if !validate_si_suffix(s){
+		//ToDo: what happens?
 	}
 	let power = match s.as_str(){
 		"K" => 3,
@@ -135,9 +135,9 @@ fn get_si_power(s: &String)-> (u8, i64){
 	(10, power.clone())
 }
 
-fn get_eic_power(s: &String) ->(u8, i64){
-	if ! (validate_si_suffix(s) || validate_eici_suffix(s)){
-
+fn get_iec_power(s: &String) ->(u8, i64){
+	if !validate_ieci_suffix(s){
+		//ToDo: what happens?
 	}
 	let power = match s.as_str(){
 		"K" => 10,
@@ -165,8 +165,8 @@ fn get_auto_power(s: &String) -> (u8, i64){
 	if validate_si_suffix(s){
 		return get_si_power(s);
 	}
-	if validate_eici_suffix(s){
-		return get_eic_power(s);
+	if validate_ieci_suffix(s){
+		return get_iec_power(s);
 	}
 	(0, 0)
 }
@@ -174,8 +174,9 @@ fn get_auto_power(s: &String) -> (u8, i64){
 fn to_si_power(base: u8, power: i64) -> (String, i64){
 	let mut pow = power.clone();
 	if base == 2{
-		// 2**(10*x) == 10**(3*x) for IEC standarts
-		pow = (pow/10)*3;
+		// (2**10)**x == (10**3)**x for IEC standarts
+		// base_2 power <=> base_10 power/10
+		pow /= 10;
 	}
 	match pow{
 		p if p >= 24 => {("Y".to_string(), p-24)},
@@ -191,15 +192,16 @@ fn to_si_power(base: u8, power: i64) -> (String, i64){
 }
 
 
-fn to_eic_power(eic_i: bool, base: u8, power: i64) -> (String, i64){
+fn to_iec_power(iec_i: bool, base: u8, power: i64) -> (String, i64){
 	let mut pow = power.clone();
-	let i = match eic_i{
+	let i = match iec_i{
 		true => {"i"},
 		false => {""}
 	};
 	if base == 10{
-		// 2**(10*x) == 10**(3*x) for IEC standarts
-		pow = (pow/3)*10;
+		// (2**10)**x == (10**3)**x for IEC standarts
+		// base_10 power <=> base_2 10*power
+		pow *= 10;
 	}
 	match pow{
 		p if p >= 80 => {("Y".to_string()+&i, p-80)},
@@ -214,7 +216,7 @@ fn to_eic_power(eic_i: bool, base: u8, power: i64) -> (String, i64){
 	}
 }
 
-fn munfmt(mut number: String, inputs:ArgMatches){
+fn numfmt(mut number: String, inputs:ArgMatches) -> Result<bool, String>{
 	// trim header lines from number if needed
     let header = inputs.value_of("header").unwrap_or("0")
     	.parse::<usize>().unwrap();
@@ -239,10 +241,10 @@ fn munfmt(mut number: String, inputs:ArgMatches){
     			get_si_power(&number)
     		},
     		"iec" => {
-    			get_eic_power(&number)
+    			get_iec_power(&number)
     		},
     		"iec-i" => {
-    			get_eic_power(&number)
+    			get_iec_power(&number)
     		}
     		_ => {
     			get_auto_power(&number)
@@ -295,10 +297,10 @@ fn munfmt(mut number: String, inputs:ArgMatches){
     			to_si_power(base, power)
     		},
     		"iec" => {
-    			to_eic_power(false, base, power)
+    			to_iec_power(false, base, power)
     		},
     		"iec-i" => {
-    			to_eic_power(true, base, power)
+    			to_iec_power(true, base, power)
     		}
     		_ => {(suffix, power)}
     	};
@@ -306,7 +308,7 @@ fn munfmt(mut number: String, inputs:ArgMatches){
     	power = tmp.1;
     }
     // todo fix that
-    res = res * base.pow(power);
+    //res = res * base.pow(power);
     
     
     let mut res = res.to_string();
@@ -327,6 +329,7 @@ fn munfmt(mut number: String, inputs:ArgMatches){
     }
 
     println!("FINAL: {:?}{:?}", res, suffix);
+    Ok(true)
 }
 
 
@@ -473,6 +476,33 @@ fn main() {
 		eprintln!("{}", "The <NUMBER> required argument were not provided");
         std::process::exit(1);
 	}
-	numbers.lines().for_each(|number| munfmt(number.to_string(), inputs.clone()));
-	
+
+	for number in numbers.lines(){
+		match inputs.value_of("invalid").unwrap_or("abort"){
+			"fail" => {
+        match numfmt(number.to_string(), inputs.clone()){
+          Ok(_) => (),
+          Err(err_string) => panic!("{}", err_string)
+        };
+      },
+			"warn" => {
+        match numfmt(number.to_string(), inputs.clone()){
+          Ok(_) => (),
+          Err(err_string) => println!("{:?}", err_string)
+        };
+      },
+			"ignore" => {
+        match numfmt(number.to_string(), inputs.clone()){
+          Ok(_) => (),
+          Err(_) => ()
+        };
+      },
+      _ => {
+        match numfmt(number.to_string(), inputs.clone()){
+          Ok(_) => (),
+          Err(_err_string) => break
+        };
+      },
+		};
+	}
 }

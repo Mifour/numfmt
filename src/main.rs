@@ -94,6 +94,7 @@ fn validate_invalid(s: String) -> Result<(), String> {
 		"fail" => Ok(()),
 		"warn" => Ok(()),
 		"ignore" => Ok(()),
+    "abort" => Ok(()),
 		_ => Err(String::from("invalid invalid mode"))
 	}
 }
@@ -118,47 +119,31 @@ fn validate_ieci_suffix(s: &String) -> bool{
 }
 
 fn get_si_power(s: &String)-> (u8, i64){
-	if !validate_si_suffix(s){
-		//ToDo: what happens?
+	match s.as_str(){
+		"K" => (10, 3),
+		"M" => (10, 6),
+		"G" => (10, 9),
+		"T" => (10, 12),
+		"P" => (10, 15),
+		"E" => (10, 18),
+		"Z" => (10, 21),
+		"Y" => (10, 24),
+		_ => (10, 1)
 	}
-	let power = match s.as_str(){
-		"K" => 3,
-		"M" => 6,
-		"G" => 9,
-		"T" => 12,
-		"P" => 15,
-		"E" => 18,
-		"Z" => 21,
-		"Y" => 24,
-		_ => 0
-	};
-	(10, power.clone())
 }
 
 fn get_iec_power(s: &String) ->(u8, i64){
-	if !validate_ieci_suffix(s){
-		//ToDo: what happens?
+	match s.as_str(){
+		"K" | "Ki" => (2, 10),
+		"M" | "Mi" => (2, 20),
+		"G" | "Gi" => (2, 30),
+		"T" | "Ti" => (2, 40),
+		"P" | "Pi" => (2, 50),
+		"E" | "Ei" => (2, 60),
+		"Z" | "Zi" => (2, 70),
+		"Y" | "Yi" => (2, 80),
+		_ => (2, 1)
 	}
-	let power = match s.as_str(){
-		"K" => 10,
-		"Ki" => 10,
-		"M" => 20,
-		"Mi" => 20,
-		"G" => 30,
-		"Gi" => 30,
-		"T" => 40,
-		"Ti" => 40,
-		"P" => 50,
-		"Pi" => 50,
-		"E" => 60,
-		"Ei" => 60,
-		"Z" => 70,
-		"Zi" => 80,
-		"Y" => 80,
-		"Yi" => 80,
-		_ => 0
-	};
-	(2, power.clone())
 }
 
 fn get_auto_power(s: &String) -> (u8, i64){
@@ -168,56 +153,55 @@ fn get_auto_power(s: &String) -> (u8, i64){
 	if validate_ieci_suffix(s){
 		return get_iec_power(s);
 	}
-	(0, 0)
+	(10, 1)
 }
 
-fn to_si_power(base: u8, power: i64) -> (String, i64){
-	let mut pow = power.clone();
-	if base == 2{
+fn to_si_power(base: &u8, power: &mut i64) -> String{
+	if *base == 2{
 		// (2**10)**x == (10**3)**x for IEC standarts
 		// base_2 power <=> base_10 power/10
-		pow /= 10;
+		*power /= 10;
 	}
-	match pow{
-		p if p >= 24 => {("Y".to_string(), p-24)},
-		p if p >= 21 => {("Z".to_string(), p-21)},
-		p if p >= 18 => {("E".to_string(), p-18)},
-		p if p >= 15 => {("P".to_string(), p-15)},
-		p if p >= 12 => {("T".to_string(), p-12)},
-		p if p >= 9 => {("G".to_string(), p-9)},
-		p if p >= 6 => {("M".to_string(), p-6)},
-		p if p >= 3 => {("K".to_string(), p-3)},
-		_ => {("".to_string(), pow)}
+	match *power{
+		p if p >= 24 => {*power -= 24; "Y".to_string()},
+		p if p >= 21 => {*power -= 21; "Z".to_string()},
+		p if p >= 18 => {*power -= 18; "E".to_string()},
+		p if p >= 15 => {*power -= 15; "P".to_string()},
+		p if p >= 12 => {*power -= 12; "T".to_string()},
+		p if p >= 9 => {*power -= 9; "G".to_string()},
+		p if p >= 6 => {*power -= 6; "M".to_string()},
+		p if p >= 3 => {*power -= 3; "K".to_string()},
+		_ => {"".to_string()}
 	}
 }
 
 
-fn to_iec_power(iec_i: bool, base: u8, power: i64) -> (String, i64){
-	let mut pow = power.clone();
+fn to_iec_power(iec_i: bool, base: &u8, power: &mut i64) -> String{
 	let i = match iec_i{
 		true => {"i"},
 		false => {""}
 	};
-	if base == 10{
+	if *base == 10{
 		// (2**10)**x == (10**3)**x for IEC standarts
 		// base_10 power <=> base_2 10*power
-		pow *= 10;
+		*power *= 10;
 	}
-	match pow{
-		p if p >= 80 => {("Y".to_string()+&i, p-80)},
-		p if p >= 70 => {("Z".to_string()+&i, p-70)},
-		p if p >= 60 => {("E".to_string()+&i, p-60)},
-		p if p >= 50 => {("P".to_string()+&i, p-50)},
-		p if p >= 40 => {("T".to_string()+&i, p-40)},
-		p if p >= 30 => {("G".to_string()+&i, p-30)},
-		p if p >= 20 => {("M".to_string()+&i, p-20)},
-		p if p >= 10 => {("K".to_string()+&i, p-10)},
-		_ => {("".to_string(), pow)}
+	match *power{
+		p if p >= 80 => {*power -= 80; "Y".to_string()+&i},
+		p if p >= 70 => {*power -= 70; "Z".to_string()+&i},
+		p if p >= 60 => {*power -= 60; "E".to_string()+&i},
+		p if p >= 50 => {*power -= 50; "P".to_string()+&i},
+		p if p >= 40 => {*power -= 40; "T".to_string()+&i},
+		p if p >= 30 => {*power -= 30; "G".to_string()+&i},
+		p if p >= 20 => {*power -= 20; "M".to_string()+&i},
+		p if p >= 10 => {*power -= 10; "K".to_string()+&i},
+		_ => {"".to_string()}
 	}
 }
 
-fn numfmt(mut number: String, inputs:ArgMatches) -> Result<bool, String>{
+fn numfmt(mut number: String, inputs: &ArgMatches) -> Result<String, String>{
 	// trim header lines from number if needed
+    let debug = inputs.is_present("debug");
     let header = inputs.value_of("header").unwrap_or("0")
     	.parse::<usize>().unwrap();
     let mut header_end:usize = 0;
@@ -255,8 +239,10 @@ fn numfmt(mut number: String, inputs:ArgMatches) -> Result<bool, String>{
     	// strip number from its old unit
     	number = "xxxx".to_string()
     }
-    println!("{:?}", base);
-    println!("{:?}", power);
+    if debug{
+      println!("{:?}", base);
+      println!("{:?}", power);
+    }
     
     
     
@@ -269,43 +255,41 @@ fn numfmt(mut number: String, inputs:ArgMatches) -> Result<bool, String>{
 
     if inputs.is_present("rounding"){
     	match inputs.value_of("rouding").unwrap_or("from-zero").to_lowercase().as_str(){
-			"up"=> {
-				res = res.ceil();
-			},
-			"down"=> {
-				res = res.floor();
-			},
-			"from-zero"=> {
-				//away from-zero
-				res = res.trunc() + res.signum();
-			},
-			"towards-zero"=> {
-				res = res.trunc();
-			},
-			"nearest"=> {
-				res = res.round();
-			},
-			_ => {}
-		}
+  			"up"=> {
+  				res = res.ceil();
+  			},
+  			"down"=> {
+  				res = res.floor();
+  			},
+  			"from-zero"=> {
+  				//away from-zero
+  				res = res.trunc() + res.signum();
+  			},
+  			"towards-zero"=> {
+  				res = res.trunc();
+  			},
+  			"nearest"=> {
+  				res = res.round();
+  			},
+  			_ => {}
+  		}
     }
 
     let mut suffix = "".to_string();
     if inputs.is_present("to"){
     	let to = inputs.value_of("to").unwrap();
-    	let tmp = match to.to_lowercase().as_str(){
+    	suffix = match to.to_lowercase().as_str(){
     		"si" => {
-    			to_si_power(base, power)
+    			to_si_power(&base, &mut power)
     		},
     		"iec" => {
-    			to_iec_power(false, base, power)
+    			to_iec_power(false, &base, &mut power)
     		},
     		"iec-i" => {
-    			to_iec_power(true, base, power)
+    			to_iec_power(true, &base, &mut power)
     		}
-    		_ => {(suffix, power)}
+    		_ => {suffix}
     	};
-    	suffix = tmp.0;
-    	power = tmp.1;
     }
     // todo fix that
     //res = res * base.pow(power);
@@ -327,9 +311,10 @@ fn numfmt(mut number: String, inputs:ArgMatches) -> Result<bool, String>{
     	res = res_vec.join(",");
 
     }
-
-    println!("FINAL: {:?}{:?}", res, suffix);
-    Ok(true)
+    if debug{
+      println!("FINAL: {:?}{:?}", res, suffix);
+    }
+    Ok(format!("{} {}", res, suffix))
 }
 
 
@@ -337,8 +322,8 @@ fn numfmt(mut number: String, inputs:ArgMatches) -> Result<bool, String>{
 fn main() {
 	//  ToDOs:
 	// 	"debug", "delimiter", "field", "format", "from", "header",
-	// 	"invalid", "padding", "suffix", "to", "zero_terminated",
-	// 	"number"
+	// 	"padding", "suffix", "to", "zero_terminated",
+	// 	
 	// 
     let inputs = App::new("numfmt")
     	.version("0.1")
@@ -460,46 +445,44 @@ fn main() {
 \t$ ls -lh | numfmt --header --field 5 --from=iec --padding=10
 \t$ ls -lh | numfmt --header --field 5 --from=iec --format %10f")
     .get_matches(); //_from_safe(arg_vec).unwrap_or_else(|e| e.exit());
-    println!("{:?}", inputs);
-    println!("is_present header: {:?}", inputs.is_present("header"));
-
-    // Retrieve the main arg NUMBER from Clap if possible else,
-    // try with stdin (in case of pipe command)
-    //let mut number = String::from(inputs.value_of("NUMBER").unwrap());
-    //let mut number = String::new();
-    let numbers = match inputs.value_of("NUMBER") {
-    	Some(value) => String::from(value),
-    	None => io::stdin().lock().lines().map(|line| line.unwrap()).take_while(|line| !line.is_empty()).collect::<Vec<String>>().join("\n")
+  println!("{:?}", inputs);
+  
+  // Retrieve the main arg NUMBER from Clap if possible else,
+  // try with stdin (in case of pipe command)
+  let numbers = match inputs.value_of("NUMBER") {
+  	Some(value) => String::from(value),
+  	None => io::stdin().lock().lines().map(|line| line.unwrap()).take_while(|line| !line.is_empty()).collect::<Vec<String>>().join("\n")
 	};
-	println!("NUMBER:{:?}", numbers);
+  println!("NUMBER:{:?}", numbers);
+  
 	if numbers.is_empty(){
-		eprintln!("{}", "The <NUMBER> required argument were not provided");
+		eprintln!("{}", "The <NUMBER> required arguments were not provided");
         std::process::exit(1);
 	}
-
+  let invalid_mode = inputs.value_of("invalid").unwrap_or("abort");
 	for number in numbers.lines(){
-		match inputs.value_of("invalid").unwrap_or("abort"){
+		match invalid_mode{
 			"fail" => {
-        match numfmt(number.to_string(), inputs.clone()){
-          Ok(_) => (),
+        match numfmt(number.to_string(), &inputs){
+          Ok(res) => println!("{}", res),
           Err(err_string) => panic!("{}", err_string)
         };
       },
 			"warn" => {
-        match numfmt(number.to_string(), inputs.clone()){
-          Ok(_) => (),
+        match numfmt(number.to_string(), &inputs){
+          Ok(res) => println!("{}", res),
           Err(err_string) => println!("{:?}", err_string)
         };
       },
 			"ignore" => {
-        match numfmt(number.to_string(), inputs.clone()){
-          Ok(_) => (),
+        match numfmt(number.to_string(), &inputs){
+          Ok(res) => println!("{}", res),
           Err(_) => ()
         };
       },
-      _ => {
-        match numfmt(number.to_string(), inputs.clone()){
-          Ok(_) => (),
+      "abort" | _ => {
+        match numfmt(number.to_string(), &inputs){
+          Ok(res) => println!("{}", res),
           Err(_err_string) => break
         };
       },

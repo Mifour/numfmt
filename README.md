@@ -1,2 +1,5 @@
-source: https://www.man7.org/linux/man-pages/man1/numfmt.1.html
+A rewrite of Numfmt in Rust.
 
+Rust coreutils: https://github.com/uutils/coreutils
+
+Gnu coreutils original numfmt's page: https://www.gnu.org/software/coreutils/manual/html_node/numfmt-invocation.html

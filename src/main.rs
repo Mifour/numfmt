@@ -210,7 +210,6 @@ fn change_system(from_base: &u32, to_base: &u32, power: &u32, number: &mut f64){
 
 fn get_fields(fields: String) -> (usize, usize){
 	match fields.find("-"){
-		//ToDOs: fix 
 		Some(_i) => {
 			let tmp = fields.split_once("-").unwrap();
 			(tmp.0.parse::<usize>().unwrap_or(usize::MAX), tmp.1.parse::<usize>().unwrap_or(usize::MAX))

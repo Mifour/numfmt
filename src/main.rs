@@ -371,9 +371,15 @@ fn numfmt_core(mut number: String, inputs: &ArgMatches) -> Result<String, String
 fn numfmt(line: String, inputs: &ArgMatches){
 	let delimiter = inputs.value_of("delimiter").unwrap_or(" ");
 	let invalid_mode = inputs.value_of("invalid").unwrap_or("abort");
-	let (start, end) = get_fields(inputs.value_of("fields").unwrap_or("1").to_string());
+	let (mut start, mut end) = get_fields(inputs.value_of("fields").unwrap_or("1").to_string());
 	let vec_line: Vec<&str> = line.split(delimiter).collect();
-	for number in &vec_line[start..end]{
+	if start == usize::MAX{
+		start = 1;
+	}
+	if end == usize::MAX{
+		end = vec_line.len();
+	}
+	for number in &vec_line[(start-1)..(end-1)]{
 		match invalid_mode{
 			"fail" => {
         match numfmt_core(number.to_string(), &inputs){

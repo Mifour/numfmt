@@ -1,6 +1,6 @@
 extern crate clap;
 use clap::{Arg, App, ArgMatches};
-use std::cmp::min;
+use std::cmp::{max, min};
 use std::io::{self, BufRead};
 
 
@@ -208,9 +208,47 @@ fn change_system(from_base: &u32, to_base: &u32, power: &u32, number: &mut f64){
   *number *= ((*from_base).pow(*power)/(*to_base).pow(corresponding_power)) as f64;
 }
 
-fn numfmt(mut number: String, inputs: &ArgMatches) -> Result<String, String>{
-	// trim header lines from number if needed
-  let debug = inputs.is_present("debug");
+fn get_fields(fields: String) -> (usize, usize){
+	match fields.find("-"){
+		//ToDOs: fix 
+		Some(_i) => {
+			let tmp = fields.split_once("-").unwrap();
+			(tmp.0.parse::<usize>().unwrap_or(usize::MAX), tmp.1.parse::<usize>().unwrap_or(usize::MAX))
+		},
+		_ => {(fields.parse::<usize>().unwrap_or(1), usize::MAX)}
+	}
+}
+
+fn padding(res: &String, res_unit: &String, suffix: &String, n_padding: i64) -> String{
+	let length = max(0, n_padding as usize - res.len() - res_unit.len());
+	match n_padding{
+  	i if i >= 0 =>{
+  		let padding = " ".repeat(length);
+  		format!("{}{}{}{}", padding, *res, *res_unit, *suffix)
+  	},
+  	_ =>{
+  		let padding = " ".repeat(length);
+  		format!("{}{}{}{}", *res, *res_unit, padding, *suffix)
+  	}
+  }
+}
+
+fn formatting(res: &String, res_unit: &String, suffix: &String, formatting: String) -> String{
+	let start = formatting.find("%").unwrap();
+	let (before,rest) = formatting.split_at(start);
+	let end = rest.find("f").unwrap();
+	let (format_core, after) = formatting.split_at(end+1);
+	let res = padding(
+		&res,
+		&res_unit,
+		&suffix,
+		format_core.trim_start_matches("%").trim_end_matches("f").parse::<i64>().unwrap_or(1)
+	);
+	format!("{}{}{}", before, res, after)
+}
+
+fn numfmt_core(mut number: String, inputs: &ArgMatches) -> Result<String, String>{
+	let debug = inputs.is_present("debug");
   
   let mut base: u32 = 10;
   let mut power: u32 = 1;
@@ -314,22 +352,62 @@ fn numfmt(mut number: String, inputs: &ArgMatches) -> Result<String, String>{
   	res = res_vec.join(",");
 
   }
-  let suffix =  inputs.value_of("suffix").unwrap_or("");
+  let suffix =  inputs.value_of("suffix").unwrap_or("").to_string();
+  if inputs.is_present("format"){
+
+  }
+
+  // format has higher priority because it include padding functionnalities
+  let to_print = match inputs.is_present("format"){
+  	true => (formatting(&res, &res_unit, &suffix, inputs.value_of("format").unwrap_or("%0f").to_string())),
+  	_ => (padding(&res, &res_unit, &suffix, inputs.value_of("padding").unwrap_or("1").parse::<i64>().unwrap()))
+  };
+  
   if debug{
     println!("FINAL: {:?}{:?} {}", res, res_unit, suffix);
   }
-  Ok(format!("{} {} {}", res, res_unit, suffix))
+  Ok(to_print)
+}
+
+fn numfmt(line: String, inputs: &ArgMatches){
+	let delimiter = inputs.value_of("delimiter").unwrap_or(" ");
+	let invalid_mode = inputs.value_of("invalid").unwrap_or("abort");
+	let (start, end) = get_fields(inputs.value_of("fields").unwrap_or("1").to_string());
+	let vec_line: Vec<&str> = line.split(delimiter).collect();
+	for number in &vec_line[start..end]{
+		match invalid_mode{
+			"fail" => {
+        match numfmt_core(number.to_string(), &inputs){
+          Ok(res) => println!("{}", res),
+          Err(err_string) => panic!("{}", err_string)
+        };
+      },
+			"warn" => {
+        match numfmt_core(number.to_string(), &inputs){
+          Ok(res) => println!("{}", res),
+          Err(err_string) => println!("{:?}", err_string)
+        };
+      },
+			"ignore" => {
+        match numfmt_core(number.to_string(), &inputs){
+          Ok(res) => println!("{}", res),
+          Err(_) => ()
+        };
+      },
+      "abort" | _ => {
+        match numfmt_core(number.to_string(), &inputs){
+          Ok(res) => println!("{}", res),
+          Err(_err_string) => break
+        };
+      },
+		};
+	}
 }
 
 
 
 fn main() {
-	//  ToDOs:
-	// 	"delimiter", "field", "format",
-	// 	"padding"
-	// 	
-	// 
-    let inputs = App::new("numfmt")
+	    let inputs = App::new("numfmt")
     	.version("0.1")
     	.author("mifour")
     	.about("rewrite of numfmt in rust - Convert numbers from/to human-readable strings")
@@ -482,33 +560,7 @@ fn main() {
     numbers = numbers.replace("\0", "\n");
   }
 
-  let invalid_mode = inputs.value_of("invalid").unwrap_or("abort");
-	for number in numbers.lines(){
-		match invalid_mode{
-			"fail" => {
-        match numfmt(number.to_string(), &inputs){
-          Ok(res) => println!("{}", res),
-          Err(err_string) => panic!("{}", err_string)
-        };
-      },
-			"warn" => {
-        match numfmt(number.to_string(), &inputs){
-          Ok(res) => println!("{}", res),
-          Err(err_string) => println!("{:?}", err_string)
-        };
-      },
-			"ignore" => {
-        match numfmt(number.to_string(), &inputs){
-          Ok(res) => println!("{}", res),
-          Err(_) => ()
-        };
-      },
-      "abort" | _ => {
-        match numfmt(number.to_string(), &inputs){
-          Ok(res) => println!("{}", res),
-          Err(_err_string) => break
-        };
-      },
-		};
+  for number in numbers.lines(){
+		numfmt(number.to_string(), &inputs);
 	}
 }

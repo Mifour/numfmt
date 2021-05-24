@@ -1,0 +1,2 @@
+https://www.gnu.org/software/coreutils/manual/html_node/numfmt-invocation.html
+https://alexey.chernyak.id.au/prefBin.xhtml

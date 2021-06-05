@@ -1,7 +1,7 @@
-extern crate clap;
 use clap::{Arg, App, ArgMatches};
+use exitcode;
 use std::cmp::{max, min};
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Error, Write};
 
 
 pub trait ModuloSignedExt {
@@ -246,7 +246,7 @@ fn formatting(res: &String, res_unit: &String, suffix: &String, formatting: Stri
 	format!("{}{}{}", before, res, after)
 }
 
-fn numfmt_core(mut number: String, inputs: &ArgMatches) -> Result<String, String>{
+fn numfmt_core(mut number: String, inputs: &ArgMatches, mut writer: impl std::io::Write) -> Result<String, Error>{
 	let debug = inputs.is_present("debug");
   
   let mut base: u32 = 10;
@@ -272,8 +272,7 @@ fn numfmt_core(mut number: String, inputs: &ArgMatches) -> Result<String, String
   	number = "xxxx".to_string()
   }
   if debug{
-    println!("{:?}", base);
-    println!("{:?}", power);
+  	writeln!(writer, "base:{:?}\npower:{:?}", base, power)?;
   }
     
     
@@ -368,7 +367,7 @@ fn numfmt_core(mut number: String, inputs: &ArgMatches) -> Result<String, String
   Ok(to_print)
 }
 
-fn numfmt(line: String, inputs: &ArgMatches){
+fn numfmt(line: String, inputs: &ArgMatches, mut writer: impl std::io::Write) -> Result<(), Error>{
 	let delimiter = inputs.value_of("delimiter").unwrap_or(" ");
 	let invalid_mode = inputs.value_of("invalid").unwrap_or("abort");
 	let (mut start, mut end) = get_fields(inputs.value_of("fields").unwrap_or("1").to_string());
@@ -382,31 +381,32 @@ fn numfmt(line: String, inputs: &ArgMatches){
 	for number in &vec_line[(start-1)..(end-1)]{
 		match invalid_mode{
 			"fail" => {
-        match numfmt_core(number.to_string(), &inputs){
-          Ok(res) => println!("{}", res),
+        match numfmt_core(number.to_string(), &inputs, &mut writer){
+          Ok(res) => writeln!(writer, "{}", res)?,
           Err(err_string) => panic!("{}", err_string)
         };
       },
 			"warn" => {
-        match numfmt_core(number.to_string(), &inputs){
-          Ok(res) => println!("{}", res),
-          Err(err_string) => println!("{:?}", err_string)
+        match numfmt_core(number.to_string(), &inputs, &mut writer){
+          Ok(res) => writeln!(writer, "{}", res)?,
+          Err(err_string) => writeln!(writer, "{}", err_string)?
         };
       },
 			"ignore" => {
-        match numfmt_core(number.to_string(), &inputs){
+        match numfmt_core(number.to_string(), &inputs, &mut writer){
           Ok(res) => println!("{}", res),
           Err(_) => ()
         };
       },
       "abort" | _ => {
-        match numfmt_core(number.to_string(), &inputs){
+        match numfmt_core(number.to_string(), &inputs, &mut writer){
           Ok(res) => println!("{}", res),
-          Err(_err_string) => break
+          Err(_) => break
         };
       },
 		};
 	}
+	Ok(())
 }
 
 
@@ -531,9 +531,19 @@ fn main() {
 \t$ ls -l  | numfmt --header --field 5 --to=iec
 \t$ ls -lh | numfmt --header --field 5 --from=iec --padding=10
 \t$ ls -lh | numfmt --header --field 5 --from=iec --format %10f")
-    .get_matches(); //_from_safe(arg_vec).unwrap_or_else(|e| e.exit());
+    .get_matches();
   println!("{:?}", inputs);
-  
+
+  /*
+  ToDOs:
+  1- No println, go writeln
+  2- exitcode
+  3- units tests
+  4- integration tests
+  */
+
+  let mut writer = std::io::stdout();
+
   // Retrieve the main arg NUMBER from Clap if possible else,
   // try with stdin (in case of pipe command)
   let mut numbers = match inputs.value_of("NUMBER") {
@@ -544,7 +554,7 @@ fn main() {
 
 	if numbers.is_empty(){
 		eprintln!("{}", "The <NUMBER> required arguments were not provided");
-        std::process::exit(1);
+        std::process::exit(exitcode::NOINPUT);
 	}
 
   //headers
@@ -557,7 +567,10 @@ fn main() {
   }
   let h_text = &numbers[..header_end];
   if !h_text.is_empty(){
-    println!("HEADERS: {:?}", h_text);
+    match writeln!(writer,"{}", h_text){
+    	Ok(_) => (),
+			Err(_) => std::process::exit(exitcode::IOERR),
+		};
   }
   numbers = numbers[header_end..].to_string();
 
@@ -566,6 +579,11 @@ fn main() {
   }
 
   for number in numbers.lines(){
-		numfmt(number.to_string(), &inputs);
+		match numfmt(number.to_string(), &inputs, &mut writer){
+			Ok(_) => (),
+			Err(_) => std::process::exit(exitcode::IOERR),
+		};
 	}
+	let _ = writer.flush();
+	std::process::exit(exitcode::OK);
 }

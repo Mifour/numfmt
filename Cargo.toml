@@ -9,3 +9,5 @@ edition = "2018"
 [dependencies]
 clap = "2.33.0"
 exitcode = "1.1.2"
+predicates = "1.0.8"
+assert_cmd = "1.0.5"

@@ -1,6 +1,6 @@
 use clap::{Arg, App, ArgMatches};
 use exitcode;
-use std::cmp::{max, min};
+use std::cmp::min;
 use std::io::{self, BufRead, Error, Write};
 
 
@@ -219,7 +219,7 @@ fn get_fields(fields: String) -> (usize, usize){
 }
 
 fn padding(res: &String, res_unit: &String, suffix: &String, n_padding: i64) -> String{
-	let length = max(0, n_padding as usize - res.len() - res_unit.len());
+	let length = n_padding as usize - min(res.len() + res_unit.len(), n_padding as usize);
 	match n_padding{
   	i if i >= 0 =>{
   		let padding = " ".repeat(length);
@@ -378,12 +378,12 @@ fn numfmt(line: String, inputs: &ArgMatches, mut writer: impl std::io::Write) ->
 	if end == usize::MAX{
 		end = vec_line.len();
 	}
-	for number in &vec_line[(start-1)..(end-1)]{
+	for number in &vec_line[(start-1)..(end)]{
 		match invalid_mode{
 			"fail" => {
         match numfmt_core(number.to_string(), &inputs, &mut writer){
           Ok(res) => writeln!(writer, "{}", res)?,
-          Err(err_string) => panic!("{}", err_string)
+          Err(err_string) => {return Err(err_string);}
         };
       },
 			"warn" => {
@@ -394,13 +394,13 @@ fn numfmt(line: String, inputs: &ArgMatches, mut writer: impl std::io::Write) ->
       },
 			"ignore" => {
         match numfmt_core(number.to_string(), &inputs, &mut writer){
-          Ok(res) => println!("{}", res),
+          Ok(res) => writeln!(writer, "{}", res)?,
           Err(_) => ()
         };
       },
       "abort" | _ => {
         match numfmt_core(number.to_string(), &inputs, &mut writer){
-          Ok(res) => println!("{}", res),
+          Ok(res) => writeln!(writer, "{}", res)?,
           Err(_) => break
         };
       },
@@ -532,8 +532,7 @@ fn main() {
 \t$ ls -lh | numfmt --header --field 5 --from=iec --padding=10
 \t$ ls -lh | numfmt --header --field 5 --from=iec --format %10f")
     .get_matches();
-  println!("{:?}", inputs);
-
+  
   /*
   ToDOs:
   1- No println, go writeln
@@ -550,11 +549,11 @@ fn main() {
   	Some(value) => String::from(value),
   	None => io::stdin().lock().lines().map(|line| line.unwrap()).take_while(|line| !line.is_empty()).collect::<Vec<String>>().join("\n")
 	};
-  println!("NUMBER:{:?}", numbers);
+  
 
 	if numbers.is_empty(){
 		eprintln!("{}", "The <NUMBER> required arguments were not provided");
-        std::process::exit(exitcode::NOINPUT);
+    std::process::exit(exitcode::NOINPUT);
 	}
 
   //headers
@@ -577,7 +576,7 @@ fn main() {
   if inputs.is_present("zero_terminated"){
     numbers = numbers.replace("\0", "\n");
   }
-
+  
   for number in numbers.lines(){
 		match numfmt(number.to_string(), &inputs, &mut writer){
 			Ok(_) => (),

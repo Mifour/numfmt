@@ -4,11 +4,11 @@ use exitcode;
 use std::io::Write;
 use std::process::{Command, Stdio}; // Run programs
 
-use crate::numfmt;
+use numfmt::*;
 
 pub const NUMFMT: &str = "numfmt";
 /*
-* use binarie path when the command does not use cargo_bin
+* use binary path when the command does not use cargo_bin
 * because "numfmt" is already a valid command in most linux distros
 */
 pub const BIN_NUMFMT :&str = "./target/debug/numfmt";
@@ -18,121 +18,174 @@ pub const BIN_NUMFMT :&str = "./target/debug/numfmt";
 *  ==============
 */
 
-
 #[test]
 fn test_is_int(){
-    assert!(is_int("2"), true);
-    assert!(is_int("-3"), true);
-    assert!(is_int("0"), true);
-    assert!(is_int("2.71"), false);
-    assert!(is_int("a"), false);
+    assert_eq!(is_int("2".to_string()), Ok(()));
+    assert_eq!(is_int("-3".to_string()), Ok(()));
+    assert_eq!(is_int("0".to_string()), Ok(()));
+    assert_ne!(is_int("2.71".to_string()), Ok(()));
+    assert_ne!(is_int("a".to_string()), Ok(()));
 }
 
 #[test]
 fn test_strick_positive_int(){
-    assert!(strick_positive_int("2"), true);
-    assert!(strick_positive_int("-3"), false);
-    assert!(strick_positive_int("0"), true);
-    assert!(strick_positive_int("2.71"), false);
-    assert!(strick_positive_int("a"), false);
+    assert_eq!(strick_positive_int("2".to_string()), Ok(()));
+    assert_ne!(strick_positive_int("0".to_string()), Ok(()));
+    assert_ne!(strick_positive_int("-3".to_string()), Ok(()));
+    assert_ne!(strick_positive_int("2.71".to_string()), Ok(()));
+    assert_ne!(strick_positive_int("a".to_string()), Ok(()));
 }
 
 #[test]
 fn test_validate_field(){
-    assert!(validate_field(""), true);
-    assert!(validate_field("3-"), true);
-    assert!(validate_field("-7"), true);
-    assert!(validate_field("6"), true);
-    assert!(validate_field("a-b"), false);
-    assert!(validate_field("0-j"), false); 
+    assert_eq!(validate_field("".to_string()), Ok(()));
+    assert_eq!(validate_field("3-".to_string()), Ok(()));
+    assert_eq!(validate_field("-7".to_string()), Ok(()));
+    assert_eq!(validate_field("6".to_string()), Ok(()));
+    assert_ne!(validate_field("a-b".to_string()), Ok(()));
+    assert_ne!(validate_field("0-j".to_string()), Ok(())); 
 }
 
 #[test]
 fn test_validate_format(){
-    assert!(validate_format(""), false);
-    assert!(validate_format("%"), false);
-    assert!(validate_format("f"), false);
-    assert!(validate_format("%1f"), true);
-    assert!(validate_format("%10f"), true);
-    assert!(validate_format("%af"), false);
+    assert_eq!(validate_format("%1f".to_string()), Ok(()));
+    assert_eq!(validate_format("%10f".to_string()), Ok(()));
+    assert_ne!(validate_format("".to_string()), Ok(()));
+    assert_ne!(validate_format("%".to_string()), Ok(()));
+    assert_ne!(validate_format("f".to_string()), Ok(()));
+    assert_ne!(validate_format("%af".to_string()), Ok(()));
 }
 
 #[test]
 fn test_validate_unit_from(){
     let inputs = vec!["auto", "si", "iec", "iec-i"];
-    assert!(inputs.all(|input| validate_unit_form(input)), true);
-    assert!(validate_unit_form("xxx"), false);
+    assert!(inputs.iter().all(|input| validate_unit_from(input.to_string()) == Ok(())));
+    assert_ne!(validate_unit_from("xxx".to_string()), Ok(()));
 }
 
 #[test]
 fn test_validate_unit_to(){
     let inputs = vec!["si", "iec", "iec-i"];
-    assert!(inputs.all(|input| validate_unit_to(input)), true);
-    assert!(validate_unit_to("xxx"), false);
+    assert!(inputs.iter().all(|input| validate_unit_to(input.to_string()) == Ok(())));
+    assert_ne!(validate_unit_to("xxx".to_string()), Ok(()));
 }
 
 #[test]
 fn test_validate_invalid(){
     let inputs = vec!["warn", "abort", "fail", "ignore"];
-    assert!(inputs.all(|input| validate_invalid(input)), true);
-    assert!(validate_invalid("xxx"), false);
+    assert!(inputs.iter().all(|input| validate_invalid(input.to_string()) == Ok(())));
+    assert_ne!(validate_invalid("xxx".to_string()), Ok(()));
 }
 
 #[test]
 fn test_validate_round(){
     let inputs = vec!["up", "down", "from-zero", "towards-zero", "nearest"];
-    assert!(inputs.all(|input| validate_round(input)), true);
-    assert!(validate_round("xxx"), false);
+    assert!(inputs.iter().all(|input| validate_round(input.to_string()) == Ok(())));
+    assert_ne!(validate_round("xxx".to_string()), Ok(()));
 }
 
 #[test]
 fn test_validate_si_suffix(){
-    assert!(validate_si_suffix(&("K")), true);
-    assert!(validate_si_suffix(&("")), false);
-    assert!(validate_si_suffix(&("A")), false);
+    assert_eq!(validate_si_suffix(&"K".to_string()), true);
+    assert_eq!(validate_si_suffix(&"".to_string()), false);
+    assert_eq!(validate_si_suffix(&"A".to_string()), false);
 }
 
 #[test]
 fn test_validate_ieci_suffix(){
-    assert!(validate_si_suffix(&("Ki")), true);
-    assert!(validate_si_suffix(&("")), false);
-    assert!(validate_si_suffix(&("k")), false);
+    assert_eq!(validate_ieci_suffix(&"Ki".to_string()), true);
+    assert_eq!(validate_ieci_suffix(&"".to_string()), false);
+    assert_eq!(validate_ieci_suffix(&"k".to_string()), false);
 }
 
 #[test]
 fn test_get_si_power(){
+    let mut base = 10;
+    let mut power = 1;
+    let s = "T".to_string();
+    get_si_power(&mut base, &mut power, &s);
+    assert_eq!((base, power), (10, 12));
 }
 
 #[test]
 fn test_get_iec_power(){
+    let mut base = 2;
+    let mut power = 1;
+    let s = "Pi".to_string();
+    get_iec_power(&mut base, &mut power, &s);
+    assert_eq!((base, power), (2, 50));
 }
 
 #[test]
 fn test_get_auto_power(){
+    let mut base = 2;
+    let mut power = 1;
+    let s = "T".to_string();
+    get_si_power(&mut base, &mut power, &s);
+    assert_eq!((base, power), (10, 12));
+
+    let mut base = 2;
+    let mut power = 1;
+    let s = "Pi".to_string();
+    get_iec_power(&mut base, &mut power, &s);
+    assert_eq!((base, power), (2, 50));
 }
 
 #[test]
 fn test_to_si_power(){
+    let base = 2;
+    let mut power = 50;
+    let suffix = to_si_power(&base, &mut power);
+    assert_eq!((power, suffix), (15, "P".to_string()));
 }
 
 #[test]
 fn test_to_iec_power(){
+    let base = 10;
+    let mut power = 12;
+    let suffix = to_iec_power(true, &base, &mut power);
+    assert_eq!(( power, suffix), (40, "Ti".to_string()));
 }
 
 #[test]
 fn test_change_system(){
+    let mut number = 2048.0;
+    change_system(&10, &2, &3, &mut number);
+    assert_eq!(number, 2000.0);
 }
 
 #[test]
 fn test_get_fields(){
+    assert_eq!(get_fields("1".to_string()), (1, usize::MAX));
+    assert_eq!(get_fields("a".to_string()), (1, usize::MAX));
+    assert_eq!(get_fields("a-".to_string()), (usize::MAX, usize::MAX));
+    assert_eq!(get_fields("".to_string()), (1, usize::MAX));
+    assert_eq!(get_fields("0-".to_string()), (0, usize::MAX));
+    assert_eq!(get_fields("-10".to_string()), (usize::MAX, 10));
+    assert_eq!(get_fields("0-1".to_string()), (0, 1));
 }
 
 #[test]
 fn test_padding(){
-
+    assert_eq!(
+        padding(&"64".to_string(), &"Ki".to_string(), &"".to_string(), 8),
+        "    64Ki".to_string()
+    );
+    assert_eq!(
+        padding(&"480".to_string(), &"M".to_string(), &" cookies".to_string(), 4),
+        "480M cookies".to_string()
+    );
 }
 
-#[test]fn formatting(){
+#[test]fn test_formatting(){
+    assert_eq!(
+        formatting(&"64".to_string(), &"Ki".to_string(), &"".to_string(), "%8f".to_string()),
+        "    64Ki".to_string()
+    );
+    assert_eq!(
+        formatting(&"480".to_string(), &"M".to_string(), &" cookies".to_string(), "%f".to_string()),
+        "480M cookies".to_string()
+    );
 }
 
 /* =====================
@@ -208,3 +261,63 @@ fn basic_pipe()-> Result<(), Box<dyn std::error::Error>>{
     assert_eq!(stdout, "42\n");
     Ok(())
 }
+
+#[test]
+fn test_example0() -> Result<(), Box<dyn std::error::Error>>{
+    //numfmt --to=si 1000 -> "1.0K"
+    let mut cmd = Command::cargo_bin(NUMFMT)?;
+    let prog = cmd.args(&["--to=si", "1000"]).assert();
+    prog.success().stdout("1.0K\n");
+    Ok(())
+}
+
+#[test]
+fn test_example1() -> Result<(), Box<dyn std::error::Error>>{
+    //numfmt --to=iec 2048 -> "2.0K"
+    let mut cmd = Command::cargo_bin(NUMFMT)?;
+    let prog = cmd.args(&["--to=iec", "2048"]).assert();
+    prog.success().stdout("2.0K\n");
+    Ok(())
+}
+
+#[test]
+fn test_example2() -> Result<(), Box<dyn std::error::Error>>{
+    //numfmt --to=iec-i 4096 -> "4.0Ki"
+    let mut cmd = Command::cargo_bin(NUMFMT)?;
+    let prog = cmd.args(&["--to=iec-i", "4096"]).assert();
+    prog.success().stdout("4.0Ki\n");
+    Ok(())
+}
+
+#[test]
+fn test_example3()-> Result<(), Box<dyn std::error::Error>>{
+    //echo 1K | numfmt --from=si -> "1000"
+    let stdout = pipe_command(
+        "echo",
+        vec!["1K".to_string()],
+        BIN_NUMFMT,
+        vec!["--from=si".to_string()]
+    )?;
+    assert_eq!(stdout, "1000\n");
+    Ok(())
+}
+
+#[test]
+fn test_example4()-> Result<(), Box<dyn std::error::Error>>{
+    //echo 1K | numfmt --from=iec -> "1024"
+    let stdout = pipe_command(
+        "echo",
+        vec!["1K".to_string()],
+        BIN_NUMFMT,
+        vec!["--from=iec".to_string()]
+    )?;
+    assert_eq!(stdout, "1024\n");
+    Ok(())
+}
+
+/*
+df -B1 | numfmt --header --field 2-4 --to=si
+ls -l  | numfmt --header --field 5 --to=iec
+ls -lh | numfmt --header --field 5 --from=iec --padding=10
+ls -lh | numfmt --header --field 5 --from=iec --format %10f
+*/

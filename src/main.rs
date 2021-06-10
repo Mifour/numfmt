@@ -3,7 +3,6 @@ use exitcode;
 use std::cmp::min;
 use std::io::{self, BufRead, Write};
 
-
 fn main() {
     let inputs = App::new("numfmt")
     	.version("0.1")

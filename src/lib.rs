@@ -1,5 +1,5 @@
 use core::cmp::min;
-use std::io::Error;
+use std::error::Error;
 
 use clap::ArgMatches;
 
@@ -18,6 +18,8 @@ macro_rules! modulo_signed_ext_impl {
 }
 modulo_signed_ext_impl! { usize i8 i16 i32 i64 }
 
+pub const DIGITS: &str = "0123456789";
+pub const DIGITALS: &str = "0123456789.,";
 
 pub fn is_int(s: String) -> Result<(), String> {
     match s.parse::<i64>() {
@@ -40,15 +42,11 @@ pub fn validate_field(s: String) -> Result<(), String> {
     let mut res = s
         .split("-")
         .into_iter()
-        .all(
-            |sub| sub.chars().all(
-                |c| "0123456789".contains(c)
-            )
-        );
+        .all(|sub| sub.chars().all(|c| DIGITS.contains(c)));
     res &= s.split("-").count() <= 2;
     match res {
         true => Ok(()),
-        false => Err(String::from("invalid arg for field"))
+        false => Err(String::from("invalid arg for field")),
     }
 }
 
@@ -162,7 +160,7 @@ pub fn to_si_power(base: &u32, power: &mut u32) -> String {
     if *base == 2 {
         // 2**(10*x) == 10**(3*x) for IEC standarts
         // base_2 power <=> base_10 power*3/10
-        *power = (*power / 10)*3;
+        *power = (*power / 10) * 3;
     }
     match *power {
         p if p >= 24 => {
@@ -209,7 +207,7 @@ pub fn to_iec_power(iec_i: bool, base: &u32, power: &mut u32) -> String {
     if *base == 10 {
         // 2**(10*x) == 10**(3*x) for IEC standarts
         // base_10 power <=> base_2 10*power/3
-        *power = (*power * 10)/3;
+        *power = (*power * 10) / 3;
     }
     match *power {
         p if p >= 80 => {
@@ -250,11 +248,10 @@ pub fn to_iec_power(iec_i: bool, base: &u32, power: &mut u32) -> String {
 
 pub fn change_system(from_base: &u32, to_base: &u32, power: &u32, number: &mut f64) {
     let corresponding_power: u32 = match *from_base {
-        2 => (*power / 10)*3,
-        _ => (*power * 10)/3,
+        2 => (*power / 10) * 3,
+        _ => (*power * 10) / 3,
     };
     *number *= (*from_base).pow(*power) as f64 / (*to_base).pow(corresponding_power) as f64;
-    
 }
 
 pub fn get_fields(fields: String) -> (usize, usize) {
@@ -302,33 +299,69 @@ pub fn formatting(res: &String, res_unit: &String, suffix: &String, formatting: 
     format!("{}{}{}", before, res, after)
 }
 
+pub fn strip_number(
+    number: &mut String,
+    suffix: &mut String,
+) -> Result<f64, std::num::ParseFloatError> {
+    let mut char_indices = number.char_indices();
+    let mut tmp = ("", "");
+    let mut char_index = char_indices.next();
+    loop {
+        match char_index {
+            Some((i, c)) => {
+                if !DIGITALS.contains(c) {
+                    tmp = (*number).split_at(i);
+                    break;
+                }
+                char_index = char_indices.next();
+            }
+            None => {
+                break;
+            }
+        }
+    }
+    *suffix = tmp.1.to_string();
+    *number = tmp.0.to_string();
+    return (*number).parse::<f64>();
+}
+
 pub fn numfmt_core(
     mut number: String,
     inputs: &ArgMatches,
     mut writer: impl std::io::Write,
-) -> Result<String, Error> {
+) -> Result<String, Box<dyn Error>> {
     let debug = inputs.is_present("debug");
 
     let mut base: u32 = 10;
     let mut power: u32 = 1;
+    let mut suffix = String::new();
+
+    // convert string to number
+    let mut res: f64;
+    match strip_number(&mut number, &mut suffix) {
+        Ok(n) => {
+            res = n;
+        }
+        Err(e) => {
+            return Err(Box::new(e));
+        }
+    }
 
     if inputs.is_present("from") {
         let from = inputs.value_of("from").unwrap_or("auto");
         match from.to_lowercase().as_str() {
-            "si" => get_si_power(&mut base, &mut power, &number),
-            "iec" => get_iec_power(&mut base, &mut power, &number),
-            "iec-i" => get_iec_power(&mut base, &mut power, &number),
-            _ => get_auto_power(&mut base, &mut power, &number),
+            "si" => get_si_power(&mut base, &mut power, &suffix),
+            "iec" => get_iec_power(&mut base, &mut power, &suffix),
+            "iec-i" => get_iec_power(&mut base, &mut power, &suffix),
+            _ => get_auto_power(&mut base, &mut power, &suffix),
         };
         // strip number from its old unit
-        number = "xxxx".to_string()
+        //number = "xxxx".to_string()
     }
     if debug {
         writeln!(writer, "base:{:?}\npower:{:?}", base, power)?;
     }
 
-    // convert string to number
-    let mut res: f64 = number.parse::<f64>().unwrap();
     // scale to unit_size
     let unit_size = inputs
         .value_of("to-unit")
@@ -403,26 +436,22 @@ pub fn numfmt_core(
 
     // format has higher priority because it include padding functionnalities
     let to_print = match inputs.is_present("format") {
-        true => {
-            formatting(
-                &res,
-                &res_unit,
-                &suffix,
-                inputs.value_of("format").unwrap_or("%0f").to_string(),
-            )
-        }
-        _ => {
-            padding(
-                &res,
-                &res_unit,
-                &suffix,
-                inputs
-                    .value_of("padding")
-                    .unwrap_or("1")
-                    .parse::<i64>()
-                    .unwrap(),
-            )
-        }
+        true => formatting(
+            &res,
+            &res_unit,
+            &suffix,
+            inputs.value_of("format").unwrap_or("%0f").to_string(),
+        ),
+        _ => padding(
+            &res,
+            &res_unit,
+            &suffix,
+            inputs
+                .value_of("padding")
+                .unwrap_or("1")
+                .parse::<i64>()
+                .unwrap(),
+        ),
     };
 
     if debug {
@@ -431,7 +460,11 @@ pub fn numfmt_core(
     Ok(to_print)
 }
 
-pub fn numfmt(line: String, inputs: &ArgMatches, mut writer: impl std::io::Write) -> Result<(), Error> {
+pub fn numfmt(
+    line: String,
+    inputs: &ArgMatches,
+    mut writer: impl std::io::Write,
+) -> Result<(), Box<dyn Error>> {
     let delimiter = inputs.value_of("delimiter").unwrap_or(" ");
     let invalid_mode = inputs.value_of("invalid").unwrap_or("abort");
     let (mut start, mut end) = get_fields(inputs.value_of("fields").unwrap_or("1").to_string());

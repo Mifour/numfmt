@@ -339,9 +339,72 @@ fn test_example4() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/*
-df -B1 | numfmt --header --field 2-4 --to=si
-ls -l  | numfmt --header --field 5 --to=iec
-ls -lh | numfmt --header --field 5 --from=iec --padding=10
-ls -lh | numfmt --header --field 5 --from=iec --format %10f
-*/
+#[test]
+fn test_example5() -> Result<(), Box<dyn std::error::Error>> {
+    //df -B1 | numfmt --header --field 2-4 --to=si
+    let stdout = pipe_command(
+        "cat",
+        vec!["./tests/df_dump.txt".to_string()],
+        BIN_NUMFMT,
+        vec![
+            "--header=1".to_string(),
+            "--field=2-4".to_string(),
+            "--to=si".to_string(),
+        ],
+    )?;
+    assert_eq!(stdout, "");
+    Ok(())
+}
+
+#[test]
+fn test_example6() -> Result<(), Box<dyn std::error::Error>> {
+    //ls -l  | numfmt --header --field 5 --to=iec
+    let stdout = pipe_command(
+        "cat",
+        vec!["./tests/ls_l_dump.txt".to_string()],
+        BIN_NUMFMT,
+        vec![
+            "--header=1".to_string(),
+            "--field=5".to_string(),
+            "--to=iec".to_string(),
+        ],
+    )?;
+    assert_eq!(stdout, "");
+    Ok(())
+}
+
+#[test]
+fn test_example7() -> Result<(), Box<dyn std::error::Error>> {
+    //ls -lh | numfmt --header --field 5 --from=iec --padding=10
+    let stdout = pipe_command(
+        "cat",
+        vec!["./tests/ls_lh_dump.txt".to_string()],
+        BIN_NUMFMT,
+        vec![
+            "--header=1".to_string(),
+            "--field=5".to_string(),
+            "--from=iec".to_string(),
+            "--padding=10".to_string(),
+        ],
+    )?;
+    assert_eq!(stdout, "");
+    Ok(())
+}
+
+#[test]
+fn test_example8() -> Result<(), Box<dyn std::error::Error>> {
+    //ls -lh | numfmt --header --field 5 --format=%10f
+    let stdout = pipe_command(
+        "cat",
+        vec!["./tests/ls_lh_dump.txt".to_string()],
+        BIN_NUMFMT,
+        vec![
+            "--header=1".to_string(),
+            "--field=5".to_string(),
+            "--from=iec".to_string(),
+            "--format=%10f".to_string(),
+        ],
+    )?;
+    assert_eq!(stdout, "");
+    Ok(())
+}

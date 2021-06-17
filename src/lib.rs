@@ -304,24 +304,24 @@ pub fn strip_number(
     suffix: &mut String,
 ) -> Result<f64, std::num::ParseFloatError> {
     let mut char_indices = number.char_indices();
-    let mut tmp = ("", "");
     let mut char_index = char_indices.next();
     loop {
         match char_index {
             Some((i, c)) => {
                 if !DIGITALS.contains(c) {
-                    tmp = (*number).split_at(i);
+                    let tmp = (*number).split_at(i);
+                    *suffix = tmp.1.to_string();
+                    *number = tmp.0.to_string();
                     break;
                 }
                 char_index = char_indices.next();
             }
             None => {
+                *suffix = "".to_string();
                 break;
             }
         }
     }
-    *suffix = tmp.1.to_string();
-    *number = tmp.0.to_string();
     return (*number).parse::<f64>();
 }
 
@@ -466,7 +466,7 @@ pub fn numfmt(
     mut writer: impl std::io::Write,
 ) -> Result<(), Box<dyn Error>> {
     let delimiter = inputs.value_of("delimiter").unwrap_or(" ");
-    let invalid_mode = inputs.value_of("invalid").unwrap_or("abort");
+    let invalid_mode = inputs.value_of("invalid").unwrap_or("fail"); //default is abort
     let (mut start, mut end) = get_fields(inputs.value_of("fields").unwrap_or("1").to_string());
     let vec_line: Vec<&str> = line.split(delimiter).collect();
     if start == usize::MAX {
@@ -475,35 +475,41 @@ pub fn numfmt(
     if end == usize::MAX {
         end = vec_line.len();
     }
-    for number in &vec_line[(start - 1)..(end)] {
-        match invalid_mode {
-            "fail" => {
-                match numfmt_core(number.to_string(), &inputs, &mut writer) {
-                    Ok(res) => writeln!(writer, "{}", res)?,
-                    Err(err_string) => {
-                        return Err(err_string);
-                    }
-                };
-            }
-            "warn" => {
-                match numfmt_core(number.to_string(), &inputs, &mut writer) {
-                    Ok(res) => writeln!(writer, "{}", res)?,
-                    Err(err_string) => writeln!(writer, "{}", err_string)?,
-                };
-            }
-            "ignore" => {
-                match numfmt_core(number.to_string(), &inputs, &mut writer) {
-                    Ok(res) => writeln!(writer, "{}", res)?,
-                    Err(_) => (),
-                };
-            }
-            "abort" | _ => {
-                match numfmt_core(number.to_string(), &inputs, &mut writer) {
-                    Ok(res) => writeln!(writer, "{}", res)?,
-                    Err(_) => break,
-                };
-            }
-        };
+
+    for (index, field) in vec_line.iter().enumerate() {
+        if start <= index+1 && index+1 <= end{
+            match invalid_mode {
+                "fail" => {
+                    match numfmt_core(field.to_string(), &inputs, &mut writer) {
+                        Ok(res) => writeln!(writer, "{}", res)?,
+                        Err(err_string) => {
+                            return Err(err_string);
+                        }
+                    };
+                }
+                "warn" => {
+                    match numfmt_core(field.to_string(), &inputs, &mut writer) {
+                        Ok(res) => writeln!(writer, "{}", res)?,
+                        Err(err_string) => writeln!(writer, "{}", err_string)?,
+                    };
+                }
+                "ignore" => {
+                    match numfmt_core(field.to_string(), &inputs, &mut writer) {
+                        Ok(res) => writeln!(writer, "{}", res)?,
+                        Err(_) => (),
+                    };
+                }
+                "abort" | _ => {
+                    match numfmt_core(field.to_string(), &inputs, &mut writer) {
+                        Ok(res) => writeln!(writer, "{}", res)?,
+                        Err(_) => break,
+                    };
+                }
+            };
+        }
+        else{
+            writeln!(writer, "{}", field)?;
+        }
     }
     Ok(())
 }

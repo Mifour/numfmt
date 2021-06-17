@@ -1,0 +1,9 @@
+Filesystem        1B-blocks        Used   Available Use% Mounted on
+dev                    2,1G           0        2,1G   0% /dev
+run                    2,1G        1,5M        2,1G   1% /run
+/dev/dm-0              119G         60G         53G  54% /
+tmpfs                  2,1G        444K        2,1G   1% /dev/shm
+tmpfs                  4,2M           0        4,2M   0% /sys/fs/cgroup
+tmpfs                  2,1G         53M        2,0G   3% /tmp
+/dev/sda1              314M        497K        314M   1% /boot/efi
+tmpfs                  407M         66K        407M   1% /run/user/1000

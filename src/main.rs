@@ -153,6 +153,10 @@ fn main() {
         std::process::exit(exitcode::NOINPUT);
     }
 
+    if inputs.is_present("zero_terminated") {
+        numbers = numbers.replace("\0", "\n");
+    }
+
     //headers
     let header = inputs
         .value_of("header")
@@ -172,10 +176,6 @@ fn main() {
         };
     }
     numbers = numbers[header_end..].to_string();
-
-    if inputs.is_present("zero_terminated") {
-        numbers = numbers.replace("\0", "\n");
-    }
 
     for number in numbers.lines() {
         match numfmt::numfmt(number.to_string(), &inputs, &mut writer) {

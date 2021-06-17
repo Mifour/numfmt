@@ -1,0 +1,9 @@
+Filesystem        1B-blocks        Used   Available Use% Mounted on
+dev              2018131392           0  2019131392   0% /dev
+run              2030877024     1486848  2029490176   1% /run
+/dev/dm-0      118575560352 59667195552 52841972288  54% /
+tmpfs            2031977024      443368  2031534656   1% /dev/shm
+tmpfs               4194404           0     4194404   0% /sys/fs/cgroup
+tmpfs            2030967024    52661272  1978314852   3% /tmp
+/dev/sda1         313932016      496616   313446410   1% /boot/efi
+tmpfs             406132128       65536   406126522   1% /run/user/1000

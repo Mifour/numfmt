@@ -95,47 +95,65 @@ fn test_validate_round() {
 #[test]
 fn test_validate_si_suffix() {
     assert_eq!(validate_si_suffix(&"K".to_string()), true);
-    assert_eq!(validate_si_suffix(&"".to_string()), false);
+    assert_eq!(validate_si_suffix(&"".to_string()), true);
     assert_eq!(validate_si_suffix(&"A".to_string()), false);
 }
 
 #[test]
 fn test_validate_ieci_suffix() {
     assert_eq!(validate_ieci_suffix(&"Ki".to_string()), true);
-    assert_eq!(validate_ieci_suffix(&"".to_string()), false);
+    assert_eq!(validate_ieci_suffix(&"".to_string()), true);
     assert_eq!(validate_ieci_suffix(&"k".to_string()), false);
 }
 
 #[test]
 fn test_get_si_power() {
+    let mut number = 7.0;
     let mut base = 10;
     let mut power = 1;
     let s = "T".to_string();
-    get_si_power(&mut base, &mut power, &s);
+    get_si_power(&mut base, &mut power, &mut number, &s);
     assert_eq!((base, power), (10, 12));
+
+    let mut number = 1000.0;
+    let mut base = 10;
+    let mut power = 1;
+    let s = "T".to_string();
+    get_si_power(&mut base, &mut power, &mut number, &s);
+    assert_eq!((base, power), (10, 15));
 }
 
 #[test]
 fn test_get_iec_power() {
+    let mut number = 1.0;
     let mut base = 2;
     let mut power = 1;
     let s = "Pi".to_string();
-    get_iec_power(&mut base, &mut power, &s);
+    get_iec_power(&mut base, &mut power, &mut number, &s);
     assert_eq!((base, power), (2, 50));
+
+    let mut number = 2.0_f64.powf(11.0);
+    let mut base = 2;
+    let mut power = 1;
+    let s = "Pi".to_string();
+    get_iec_power(&mut base, &mut power, &mut number, &s);
+    assert_eq!((base, power), (2, 60));
 }
 
 #[test]
 fn test_get_auto_power() {
+    let mut number = 1.0;
     let mut base = 2;
     let mut power = 1;
     let s = "T".to_string();
-    get_si_power(&mut base, &mut power, &s);
+    get_si_power(&mut base, &mut power, &mut number, &s);
     assert_eq!((base, power), (10, 12));
 
+    let mut number = 1.0;
     let mut base = 2;
     let mut power = 1;
     let s = "Pi".to_string();
-    get_iec_power(&mut base, &mut power, &s);
+    get_iec_power(&mut base, &mut power, &mut number, &s);
     assert_eq!((base, power), (2, 50));
 }
 

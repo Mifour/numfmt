@@ -18,8 +18,12 @@ macro_rules! modulo_signed_ext_impl {
 }
 modulo_signed_ext_impl! { usize i8 i16 i32 i64 }
 
+
 pub const DIGITS: &str = "0123456789";
 pub const DIGITALS: &str = "0123456789.,";
+pub const IEC_SUFFIXES: [&'static str; 9] = ["","Ki","Mi","Gi","Ti","Pi","Ei","Zi","Yi"];
+pub const SI_SUFFIXES: [&'static str; 9] = ["","K","M","G","T","P","E","Z","Y"];
+
 
 pub fn is_int(s: String) -> Result<(), String> {
     match s.parse::<i64>() {
@@ -110,16 +114,16 @@ pub fn validate_round(s: String) -> Result<(), String> {
 }
 
 pub fn validate_si_suffix(s: &String) -> bool {
-    s.len() == 1 && "KMGTPEZY".contains(s)
+    SI_SUFFIXES.contains(&(s.as_str()))
 }
 
 pub fn validate_ieci_suffix(s: &String) -> bool {
-    s.len() == 2 && "KiMiGiTiPiEiZiYi".contains(s)
+    IEC_SUFFIXES.contains(&(s.as_str()))
 }
 
-pub fn get_si_power(base: &mut u32, power: &mut u32, s: &String) {
+pub fn get_si_power(base: &mut u32, power: &mut u32, number: &mut f64, unit: &String) {
     *base = 10;
-    *power = match s.as_str() {
+    *power = match unit.as_str() {
         "K" => (3),
         "M" => (6),
         "G" => (9),
@@ -128,13 +132,16 @@ pub fn get_si_power(base: &mut u32, power: &mut u32, s: &String) {
         "E" => (18),
         "Z" => (21),
         "Y" => (24),
-        _ => (1),
+        _ => (0),
     };
+    let numb_power = number.log10().trunc() as u32;
+    *power += 3*(numb_power/3);
+    *number /= (*base).pow(3*(numb_power/3)) as f64;
 }
 
-pub fn get_iec_power(base: &mut u32, power: &mut u32, s: &String) {
+pub fn get_iec_power(base: &mut u32, power: &mut u32, number: &mut f64, unit: &String) {
     *base = 2;
-    *power = match s.as_str() {
+    *power = match unit.as_str() {
         "K" | "Ki" => (10),
         "M" | "Mi" => (20),
         "G" | "Gi" => (30),
@@ -143,16 +150,21 @@ pub fn get_iec_power(base: &mut u32, power: &mut u32, s: &String) {
         "E" | "Ei" => (60),
         "Z" | "Zi" => (70),
         "Y" | "Yi" => (80),
-        _ => (1),
+        _ => (0),
     };
+    let numb_power = number.log2().trunc() as u32;
+    *power += 10*(numb_power/10);
+    *number /= (*base).pow(10*(numb_power/10)) as f64;
 }
 
-pub fn get_auto_power(base: &mut u32, power: &mut u32, s: &String) {
+pub fn get_auto_power(base: &mut u32, power: &mut u32, number: &mut f64, s: &String) {
     if validate_si_suffix(s) {
-        get_si_power(base, power, s);
+        get_si_power(base, power, number, s);
+        return;
     }
     if validate_ieci_suffix(s) {
-        get_iec_power(base, power, s);
+        get_iec_power(base, power, number, s);
+        return;
     }
 }
 
@@ -347,20 +359,19 @@ pub fn numfmt_core(
         }
     }
 
-    if inputs.is_present("from") {
-        let from = inputs.value_of("from").unwrap_or("auto");
-        match from.to_lowercase().as_str() {
-            "si" => get_si_power(&mut base, &mut power, &suffix),
-            "iec" => get_iec_power(&mut base, &mut power, &suffix),
-            "iec-i" => get_iec_power(&mut base, &mut power, &suffix),
-            _ => get_auto_power(&mut base, &mut power, &suffix),
-        };
-        // strip number from its old unit
-        //number = "xxxx".to_string()
-    }
+    let from = inputs.value_of("from").unwrap_or("auto");
+    match from.to_lowercase().as_str() {
+        "si" => get_si_power(&mut base, &mut power, &mut res, &suffix),
+        "iec" => get_iec_power(&mut base, &mut power, &mut res, &suffix),
+        "iec-i" => get_iec_power(&mut base, &mut power, &mut res, &suffix),
+        _ => get_auto_power(&mut base, &mut power, &mut res, &suffix),
+    };
+    
     if debug {
         writeln!(writer, "base:{:?}\npower:{:?}", base, power)?;
     }
+    println!("res = {}", res);
+    
 
     // scale to unit_size
     let unit_size = inputs
@@ -417,6 +428,7 @@ pub fn numfmt_core(
     }
 
     let mut res = res.to_string();
+    println!("res = {}", res);
     // convert to exporting format
     if inputs.is_present("grouping") {
         let res_str = res.clone();

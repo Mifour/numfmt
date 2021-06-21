@@ -2,6 +2,7 @@ use core::cmp::min;
 use std::error::Error;
 
 use clap::ArgMatches;
+use regex::Regex;
 
 pub trait ModuloSignedExt {
     fn modulo(&self, n: Self) -> Self;
@@ -350,6 +351,8 @@ pub fn numfmt_core(
 
     // convert string to number
     let mut res: f64;
+    //println!("number {}", number);
+
     match strip_number(&mut number, &mut suffix) {
         Ok(n) => {
             res = n;
@@ -358,6 +361,7 @@ pub fn numfmt_core(
             return Err(Box::new(e));
         }
     }
+    //println!("res {}", res);
 
     let from = inputs.value_of("from").unwrap_or("auto");
     match from.to_lowercase().as_str() {
@@ -370,9 +374,7 @@ pub fn numfmt_core(
     if debug {
         writeln!(writer, "base:{:?}\npower:{:?}", base, power)?;
     }
-    println!("res = {}", res);
     
-
     // scale to unit_size
     let unit_size = inputs
         .value_of("to-unit")
@@ -409,7 +411,7 @@ pub fn numfmt_core(
     }
 
     let to_base = match inputs.value_of("to").unwrap_or("si") {
-        "iec" => (2),
+        "iec" | "iec-i" => (2),
         "si" | _ => (10),
     };
     if base != to_base {
@@ -426,9 +428,11 @@ pub fn numfmt_core(
             _ => res_unit,
         };
     }
+    else{
+        res_unit = suffix;
+    }
 
     let mut res = res.to_string();
-    println!("res = {}", res);
     // convert to exporting format
     if inputs.is_present("grouping") {
         let res_str = res.clone();
@@ -479,21 +483,30 @@ pub fn numfmt(
 ) -> Result<(), Box<dyn Error>> {
     let delimiter = inputs.value_of("delimiter").unwrap_or(" ");
     let invalid_mode = inputs.value_of("invalid").unwrap_or("fail"); //default is abort
-    let (mut start, mut end) = get_fields(inputs.value_of("fields").unwrap_or("1").to_string());
-    let vec_line: Vec<&str> = line.split(delimiter).collect();
+    let (mut start, end) = get_fields(inputs.value_of("field").unwrap_or("1").to_string());
     if start == usize::MAX {
         start = 1;
     }
-    if end == usize::MAX {
-        end = vec_line.len();
-    }
+    //println!("fields {},{}", start, end);
 
-    for (index, field) in vec_line.iter().enumerate() {
-        if start <= index+1 && index+1 <= end{
+    let re = Regex::new(
+        &(format!(r"([^{}]+|[{}]+)", delimiter, delimiter).as_str())
+    ).unwrap();
+
+    let mut index = 1;
+    let mut space: bool;
+    for cap in re.captures_iter(&line) {
+        let field = &cap[0];
+        space = field.contains(delimiter);
+        if space{
+            index += 1;
+        }
+        //println!("re line: {} at {}", field, index);
+        if !space && start <= index && index <= end{
             match invalid_mode {
                 "fail" => {
                     match numfmt_core(field.to_string(), &inputs, &mut writer) {
-                        Ok(res) => writeln!(writer, "{}", res)?,
+                        Ok(res) => write!(writer, "{}", res)?,
                         Err(err_string) => {
                             return Err(err_string);
                         }
@@ -501,27 +514,27 @@ pub fn numfmt(
                 }
                 "warn" => {
                     match numfmt_core(field.to_string(), &inputs, &mut writer) {
-                        Ok(res) => writeln!(writer, "{}", res)?,
-                        Err(err_string) => writeln!(writer, "{}", err_string)?,
+                        Ok(res) => write!(writer, "{}", res)?,
+                        Err(err_string) => write!(writer, "{}", err_string)?,
                     };
                 }
                 "ignore" => {
                     match numfmt_core(field.to_string(), &inputs, &mut writer) {
-                        Ok(res) => writeln!(writer, "{}", res)?,
+                        Ok(res) => write!(writer, "{}", res)?,
                         Err(_) => (),
                     };
                 }
                 "abort" | _ => {
                     match numfmt_core(field.to_string(), &inputs, &mut writer) {
-                        Ok(res) => writeln!(writer, "{}", res)?,
+                        Ok(res) => write!(writer, "{}", res)?,
                         Err(_) => break,
                     };
                 }
             };
         }
         else{
-            writeln!(writer, "{}", field)?;
+            write!(writer, "{}", field)?;
         }
     }
-    Ok(())
+    Ok(write!(writer, "{}", if inputs.is_present("zero_terminated") {"\0"} else {"\n"})?)
 }

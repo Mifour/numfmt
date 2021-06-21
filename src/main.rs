@@ -1,6 +1,6 @@
 use clap::{App, Arg};
 use exitcode;
-use std::cmp::min;
+use std::cmp::{min, max};
 use std::io::{self, BufRead, Write};
 
 fn main() {
@@ -152,7 +152,7 @@ fn main() {
         eprintln!("{}", "The <NUMBER> required arguments were not provided");
         std::process::exit(exitcode::NOINPUT);
     }
-
+    
     if inputs.is_present("zero_terminated") {
         numbers = numbers.replace("\0", "\n");
     }
@@ -166,7 +166,7 @@ fn main() {
     let mut header_end: usize = 0;
     if header > 0 {
         let indices: Vec<(usize, &str)> = numbers.match_indices("\n").collect();
-        header_end = indices[min(indices.len(), header)].0;
+        header_end = indices[max(min(indices.len(), header) - 1, 0)].0;
     }
     let h_text = &numbers[..header_end];
     if !h_text.is_empty() {
@@ -176,11 +176,16 @@ fn main() {
         };
     }
     numbers = numbers[header_end..].to_string();
-
+    
+    if numbers.starts_with("\n"){
+        let _ =numbers.remove(0);
+    }
+    
     for number in numbers.lines() {
+        //println!("line: {}", number);
         match numfmt::numfmt(number.to_string(), &inputs, &mut writer) {
             Ok(_) => (),
-            Err(_) => std::process::exit(exitcode::IOERR),
+            Err(e) => { eprintln!("{}", e); }//std::process::exit(exitcode::IOERR),
         };
     }
     let _ = writer.flush();

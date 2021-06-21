@@ -3,6 +3,7 @@ use assert_cmd::prelude::*; // Add methods on commands
 use exitcode;
 use std::io::Write;
 use std::process::{Command, Stdio}; // Run programs
+use std::fs;
 
 use numfmt::*;
 
@@ -270,7 +271,7 @@ fn pipe_command(
     let output = child.wait_with_output();
     return match output {
         Ok(res) => Ok(String::from_utf8_lossy(&res.stdout).to_string()),
-        Err(e) => Err(Box::new(e)),
+        Err(e) => {eprintln!("{}", e); Err(Box::new(e))},
     };
 }
 
@@ -314,7 +315,7 @@ fn test_example0() -> Result<(), Box<dyn std::error::Error>> {
     //numfmt --to=si 1000 -> "1.0K"
     let mut cmd = Command::cargo_bin(NUMFMT)?;
     let prog = cmd.args(&["--to=si", "1000"]).assert();
-    prog.success().stdout("1.0K\n");
+    prog.success().stdout("1K\n");
     Ok(())
 }
 
@@ -323,7 +324,7 @@ fn test_example1() -> Result<(), Box<dyn std::error::Error>> {
     //numfmt --to=iec 2048 -> "2.0K"
     let mut cmd = Command::cargo_bin(NUMFMT)?;
     let prog = cmd.args(&["--to=iec", "2048"]).assert();
-    prog.success().stdout("2.0K\n");
+    prog.success().stdout("2K\n");
     Ok(())
 }
 
@@ -332,7 +333,7 @@ fn test_example2() -> Result<(), Box<dyn std::error::Error>> {
     //numfmt --to=iec-i 4096 -> "4.0Ki"
     let mut cmd = Command::cargo_bin(NUMFMT)?;
     let prog = cmd.args(&["--to=iec-i", "4096"]).assert();
-    prog.success().stdout("4.0Ki\n");
+    prog.success().stdout("4Ki\n");
     Ok(())
 }
 
@@ -340,7 +341,7 @@ fn test_example2() -> Result<(), Box<dyn std::error::Error>> {
 fn test_example3() -> Result<(), Box<dyn std::error::Error>> {
     //echo 1K | numfmt --from=si -> "1000"
     let stdout = pipe_command("echo", vec!["1K".to_string()], BIN_NUMFMT, vec![])?;
-    assert_eq!(stdout, "1000\n");
+    assert_eq!(stdout, "1K\n");
     Ok(())
 }
 
@@ -353,7 +354,7 @@ fn test_example4() -> Result<(), Box<dyn std::error::Error>> {
         BIN_NUMFMT,
         vec!["--from=iec".to_string()],
     )?;
-    assert_eq!(stdout, "1024\n");
+    assert_eq!(stdout, "1.024K\n");
     Ok(())
 }
 
@@ -370,7 +371,9 @@ fn test_example5() -> Result<(), Box<dyn std::error::Error>> {
             "--to=si".to_string(),
         ],
     )?;
-    assert_eq!(stdout, "");
+    let expected = fs::read_to_string("./tests/df_expected.txt")
+        .expect("Failed to read file");
+    assert_eq!(stdout, expected);
     Ok(())
 }
 
@@ -387,7 +390,9 @@ fn test_example6() -> Result<(), Box<dyn std::error::Error>> {
             "--to=iec".to_string(),
         ],
     )?;
-    assert_eq!(stdout, "");
+    let expected = fs::read_to_string("./tests/ls_l_expected.txt")
+        .expect("Failed to read file");
+    assert_eq!(stdout, expected);
     Ok(())
 }
 
@@ -405,7 +410,9 @@ fn test_example7() -> Result<(), Box<dyn std::error::Error>> {
             "--padding=10".to_string(),
         ],
     )?;
-    assert_eq!(stdout, "");
+    let expected = fs::read_to_string("./tests/ls_lh_expected.txt")
+        .expect("Failed to read file");
+    assert_eq!(stdout, expected);
     Ok(())
 }
 
@@ -423,6 +430,8 @@ fn test_example8() -> Result<(), Box<dyn std::error::Error>> {
             "--format=%10f".to_string(),
         ],
     )?;
-    assert_eq!(stdout, "");
+    let expected = fs::read_to_string("./tests/ls_lh_expected.txt")
+        .expect("Failed to read file");
+    assert_eq!(stdout, expected);
     Ok(())
 }

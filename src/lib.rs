@@ -24,7 +24,7 @@ pub const DIGITS: &str = "0123456789";
 pub const DIGITALS: &str = "0123456789.,";
 pub const IEC_SUFFIXES: [&'static str; 9] = ["","Ki","Mi","Gi","Ti","Pi","Ei","Zi","Yi"];
 pub const SI_SUFFIXES: [&'static str; 9] = ["","K","M","G","T","P","E","Z","Y"];
-
+pub const DEFAULT_FIELD: &str = "1-18446744073709551615";
 
 pub fn is_int(s: String) -> Result<(), String> {
     match s.parse::<i64>() {
@@ -276,7 +276,12 @@ pub fn get_fields(fields: String) -> (usize, usize) {
                 tmp.1.parse::<usize>().unwrap_or(usize::MAX),
             )
         }
-        _ => (fields.parse::<usize>().unwrap_or(1), usize::MAX),
+        _ => {
+            match fields.parse::<usize>(){
+                Ok(i) => (i,i),
+                Err(_) => (1, usize::MAX)
+            }
+        },
     }
 }
 
@@ -341,6 +346,7 @@ pub fn strip_number(
 pub fn numfmt_core(
     mut number: String,
     inputs: &ArgMatches,
+    locale_decimal_point: &str,
     mut writer: impl std::io::Write,
 ) -> Result<String, Box<dyn Error>> {
     let debug = inputs.is_present("debug");
@@ -351,6 +357,7 @@ pub fn numfmt_core(
 
     // convert string to number
     let mut res: f64;
+    number = number.replace(locale_decimal_point, ".");
     //println!("number {}", number);
 
     match strip_number(&mut number, &mut suffix) {
@@ -358,7 +365,7 @@ pub fn numfmt_core(
             res = n;
         }
         Err(e) => {
-            return Err(Box::new(e));
+            return {eprintln!("strip {}", e); Err(Box::new(e))};
         }
     }
     //println!("res {}", res);
@@ -472,6 +479,7 @@ pub fn numfmt_core(
 
     if debug {
         println!("FINAL: {:?}{:?} {}", res, res_unit, suffix);
+        println!("or:{}",to_print);
     }
     Ok(to_print)
 }
@@ -479,11 +487,12 @@ pub fn numfmt_core(
 pub fn numfmt(
     line: String,
     inputs: &ArgMatches,
+    locale_decimal_point: &str,
     mut writer: impl std::io::Write,
 ) -> Result<(), Box<dyn Error>> {
     let delimiter = inputs.value_of("delimiter").unwrap_or(" ");
     let invalid_mode = inputs.value_of("invalid").unwrap_or("fail"); //default is abort
-    let (mut start, end) = get_fields(inputs.value_of("field").unwrap_or("1").to_string());
+    let (mut start, end) = get_fields(inputs.value_of("field").unwrap_or(&DEFAULT_FIELD).to_string());
     if start == usize::MAX {
         start = 1;
     }
@@ -505,7 +514,7 @@ pub fn numfmt(
         if !space && start <= index && index <= end{
             match invalid_mode {
                 "fail" => {
-                    match numfmt_core(field.to_string(), &inputs, &mut writer) {
+                    match numfmt_core(field.to_string(), &inputs, &locale_decimal_point, &mut writer) {
                         Ok(res) => write!(writer, "{}", res)?,
                         Err(err_string) => {
                             return Err(err_string);
@@ -513,19 +522,19 @@ pub fn numfmt(
                     };
                 }
                 "warn" => {
-                    match numfmt_core(field.to_string(), &inputs, &mut writer) {
+                    match numfmt_core(field.to_string(), &inputs, &locale_decimal_point, &mut writer) {
                         Ok(res) => write!(writer, "{}", res)?,
                         Err(err_string) => write!(writer, "{}", err_string)?,
                     };
                 }
                 "ignore" => {
-                    match numfmt_core(field.to_string(), &inputs, &mut writer) {
+                    match numfmt_core(field.to_string(), &inputs, &locale_decimal_point, &mut writer) {
                         Ok(res) => write!(writer, "{}", res)?,
                         Err(_) => (),
                     };
                 }
                 "abort" | _ => {
-                    match numfmt_core(field.to_string(), &inputs, &mut writer) {
+                    match numfmt_core(field.to_string(), &inputs, &locale_decimal_point, &mut writer) {
                         Ok(res) => write!(writer, "{}", res)?,
                         Err(_) => break,
                     };

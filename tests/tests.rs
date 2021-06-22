@@ -183,7 +183,7 @@ fn test_change_system() {
 
 #[test]
 fn test_get_fields() {
-    assert_eq!(get_fields("1".to_string()), (1, usize::MAX));
+    assert_eq!(get_fields("1".to_string()), (1, 1));
     assert_eq!(get_fields("a".to_string()), (1, usize::MAX));
     assert_eq!(get_fields("a-".to_string()), (usize::MAX, usize::MAX));
     assert_eq!(get_fields("".to_string()), (1, usize::MAX));

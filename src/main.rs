@@ -2,6 +2,8 @@ use clap::{App, Arg};
 use exitcode;
 use std::cmp::{min, max};
 use std::io::{self, BufRead, Write};
+use std::process::Command;
+
 
 fn main() {
     let inputs = App::new("numfmt")
@@ -125,13 +127,6 @@ fn main() {
 \t$ ls -lh | numfmt --header --field 5 --from=iec --format %10f")
     .get_matches();
 
-    /*
-    ToDOs:
-    1- No println, go writeln
-    2- exitcode
-    3- units tests
-    4- integration tests
-    */
 
     let mut writer = std::io::stdout();
 
@@ -152,12 +147,28 @@ fn main() {
         eprintln!("{}", "The <NUMBER> required arguments were not provided");
         std::process::exit(exitcode::NOINPUT);
     }
+
+    // determine the local decimal point symbol
+    // TODO: fully implment locale LC_NUMERIC support
+    let locale_output = match Command::new("locale").arg("LC_NUMERIC").output() {
+        Ok(output) => (output.stdout),
+        _ => (vec![46 as u8]),
+    };
+    //println!("locale output {:?}", &locale_output[..1]);
+    let locale_decimal_point = match std::str::from_utf8(&locale_output[..1]) {
+        Ok(s) => match s{
+            "," => (","),
+            _ => (".")
+        },
+        Err(_) => ".", //default en_US.UTF-8
+    };
+    //println!("locale {}", locale_decimal_point);
     
     if inputs.is_present("zero_terminated") {
         numbers = numbers.replace("\0", "\n");
     }
 
-    //headers
+    //writing headers without parsing the content
     let header = inputs
         .value_of("header")
         .unwrap_or("0")
@@ -183,7 +194,7 @@ fn main() {
     
     for number in numbers.lines() {
         //println!("line: {}", number);
-        match numfmt::numfmt(number.to_string(), &inputs, &mut writer) {
+        match numfmt::numfmt(number.to_string(), &inputs, &locale_decimal_point, &mut writer) {
             Ok(_) => (),
             Err(e) => { eprintln!("{}", e); }//std::process::exit(exitcode::IOERR),
         };

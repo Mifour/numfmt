@@ -1,9 +1,9 @@
 total 36
--rw-r--r-- 1 user user 7,4K  5 june  17:04 Cargo.lock
+-rw-r--r-- 1 user user 7.4K  5 june  17:04 Cargo.lock
 -rw-r--r-- 1 user user  300  5 june  17:04 Cargo.toml
--rw-r--r-- 1 user user 1,1K 14 june  21:25 license.txt
+-rw-r--r-- 1 user user 1.1K 14 june  21:25 license.txt
 -rw-r--r-- 1 user user  123 24 may   11:40 links.txt
 -rw-r--r-- 1 user user  200 24 may   23:07 README.md
-drwxr-xr-x 2 user user 4,0K  8 june  10:42 src
-drwxr-xr-x 4 user user 4,0K 13 may   10:47 target
-drwxr-xr-x 2 user user 4,0K 11 june  11:31 tests
+drwxr-xr-x 2 user user 4.0K  8 june  10:42 src
+drwxr-xr-x 4 user user 4.0K 13 may   10:47 target
+drwxr-xr-x 2 user user 4.0K 11 june  11:31 tests

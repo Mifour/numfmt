@@ -179,10 +179,12 @@ fn main() {
         header_end = indices[max(min(indices.len(), header) - 1, 0)].0;
     }
     let h_text = &numbers[..header_end];
-    match writeln!(writer, "{}", h_text) {
-        Ok(_) => (),
-        Err(_) => std::process::exit(exitcode::IOERR),
-    };
+    if !h_text.is_empty(){
+        match writeln!(writer, "{}", h_text) {
+            Ok(_) => (),
+            Err(_) => std::process::exit(exitcode::IOERR),
+        };
+    }
     numbers = numbers[header_end..].to_string();
     
     if numbers.starts_with("\n"){

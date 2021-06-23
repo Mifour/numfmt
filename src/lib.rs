@@ -436,6 +436,11 @@ pub fn numfmt_core(
         change_system(&base, &to_base, &power, &mut res);
     }
 
+    if res.fract().to_string().len() > 5 {
+        // limiting fraction part
+        res = res.trunc() + (10.0*res.fract()).round()/10.0;
+    }
+
     let mut res_unit = "".to_string();
     if inputs.is_present("to") {
         let to = inputs.value_of("to").unwrap();
@@ -513,7 +518,7 @@ pub fn numfmt(
         &(format!(r"([^{}]+|[{}]+)", delimiter, delimiter).as_str())
     ).unwrap();
 
-    let mut index = 1;
+    let mut index = 0;
     let mut space: bool;
     for cap in re.captures_iter(&line) {
         // iter on each group of chars

@@ -321,6 +321,9 @@ pub fn strip_number(
     number: &mut String,
     suffix: &mut String,
 ) -> Result<f64, std::num::ParseFloatError> {
+    /*
+    Try striping the number by itering on chars until it is not a digit anymore.
+    */
     let mut char_indices = number.char_indices();
     let mut char_index = char_indices.next();
     loop {
@@ -349,8 +352,13 @@ pub fn numfmt_core(
     locale_decimal_point: &str,
     mut writer: impl std::io::Write,
 ) -> Result<String, Box<dyn Error>> {
-    let debug = inputs.is_present("debug");
 
+    /* 
+    First part of this function about "understanding" or "importing" the number.
+    The second half is more about "preparing" or "exporting" the number.
+    */
+
+    let debug = inputs.is_present("debug");
     let mut base: u32 = 10;
     let mut power: u32 = 1;
     let mut suffix = String::new();
@@ -365,11 +373,12 @@ pub fn numfmt_core(
             res = n;
         }
         Err(e) => {
-            return {eprintln!("strip {}", e); Err(Box::new(e))};
+            return Err(Box::new(e));
         }
     }
     //println!("res {}", res);
 
+    // determine base and power of number
     let from = inputs.value_of("from").unwrap_or("auto");
     match from.to_lowercase().as_str() {
         "si" => get_si_power(&mut base, &mut power, &mut res, &suffix),
@@ -417,10 +426,12 @@ pub fn numfmt_core(
         }
     }
 
+    // preparing the base to export the number
     let to_base = match inputs.value_of("to").unwrap_or("si") {
         "iec" | "iec-i" => (2),
         "si" | _ => (10),
     };
+    // change base only if necessary
     if base != to_base {
         change_system(&base, &to_base, &power, &mut res);
     }
@@ -505,13 +516,15 @@ pub fn numfmt(
     let mut index = 1;
     let mut space: bool;
     for cap in re.captures_iter(&line) {
+        // iter on each group of chars
         let field = &cap[0];
         space = field.contains(delimiter);
-        if space{
+        if !space{
             index += 1;
         }
         //println!("re line: {} at {}", field, index);
         if !space && start <= index && index <= end{
+            // if the group of char is one of those asked by the user, format it
             match invalid_mode {
                 "fail" => {
                     match numfmt_core(field.to_string(), &inputs, &locale_decimal_point, &mut writer) {
@@ -545,5 +558,6 @@ pub fn numfmt(
             write!(writer, "{}", field)?;
         }
     }
+    // write newline
     Ok(write!(writer, "{}", if inputs.is_present("zero_terminated") {"\0"} else {"\n"})?)
 }

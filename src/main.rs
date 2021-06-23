@@ -90,7 +90,6 @@ fn main() {
     	.arg(
     		Arg::with_name("NUMBER")
     		.help("input to use"))
-    		//.required(true))
     	.after_help(
     		"UNIT options:\n\tnone   no auto-scaling is done; suffixes will trigger an error
 \tauto   accept optional single/two letter suffix(1K = 1000, 1Ki = 1024, 1M = 1000000, 1Mi = 1048576)
@@ -128,7 +127,7 @@ fn main() {
     .get_matches();
 
 
-    let mut writer = std::io::stdout();
+    let mut writer = io::stdout();
 
     // Retrieve the main arg NUMBER from Clap if possible else,
     // try with stdin (in case of pipe command)
@@ -168,7 +167,7 @@ fn main() {
         numbers = numbers.replace("\0", "\n");
     }
 
-    //writing headers without parsing the content
+    //writing headers lines without parsing the content
     let header = inputs
         .value_of("header")
         .unwrap_or("0")
@@ -180,25 +179,39 @@ fn main() {
         header_end = indices[max(min(indices.len(), header) - 1, 0)].0;
     }
     let h_text = &numbers[..header_end];
-    if !h_text.is_empty() {
-        match writeln!(writer, "{}", h_text) {
-            Ok(_) => (),
-            Err(_) => std::process::exit(exitcode::IOERR),
-        };
-    }
+    match writeln!(writer, "{}", h_text) {
+        Ok(_) => (),
+        Err(_) => std::process::exit(exitcode::IOERR),
+    };
     numbers = numbers[header_end..].to_string();
     
     if numbers.starts_with("\n"){
-        let _ =numbers.remove(0);
+        let _ = numbers.remove(0);
     }
     
     for number in numbers.lines() {
+        // iter line by line
         //println!("line: {}", number);
         match numfmt::numfmt(number.to_string(), &inputs, &locale_decimal_point, &mut writer) {
             Ok(_) => (),
-            Err(e) => { eprintln!("{}", e); }//std::process::exit(exitcode::IOERR),
+            Err(e) => {
+                if let Some(err) = e.downcast_ref::<io::Error>() {
+                    eprintln!("IO Error: {}", err);
+                    std::process::exit(exitcode::IOERR);
+                }
+                else if let Some(err) = e.downcast_ref::<std::string::ParseError>() {
+                    eprintln!("Parse Error: {}", err);
+                    std::process::exit(exitcode::DATAERR);
+                }
+                else{
+                    eprintln!("{}", e); 
+                    std::process::exit(exitcode::SOFTWARE);
+                }
+            }
         };
     }
     let _ = writer.flush();
     std::process::exit(exitcode::OK);
 }
+
+//
